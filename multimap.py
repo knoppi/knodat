@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
+import scipy.signal as ssignal
 import matplotlib.pyplot as plt
 import logging
 
@@ -18,7 +19,8 @@ formatter = logging.Formatter(
 
 ch = logging.StreamHandler()
 ch.setFormatter(formatter)
-ch.setLevel(logging.INFO)
+ch.setLevel(logging.WARNING)
+#ch.setLevel(logging.DEBUG)
 
 module_logger.addHandler(ch)
 
@@ -26,6 +28,19 @@ module_logger.setLevel(logging.DEBUG)
 
 # define a global zero
 ZERO = 1E-6
+
+def gauss_kern(size, sizey=None):
+    """ Returns a normalized 2D gauss kernel array for convolutions """
+    module_logger.debug("called gauss_kern with size = %i" % size)
+    size = int(size)
+    if not sizey:
+        sizey = size
+    else:
+        sizey = int(sizey)
+    x, y = np.mgrid[-size:size+1, -sizey:sizey+1]
+    g = np.exp(-(x**2/float(size)+y**2/float(sizey)))
+    return g / g.sum()
+
 
 class MultiMap:
     def __init__(self, _fileName=None, _cols=None):
@@ -37,6 +52,11 @@ class MultiMap:
             self.set_column_names(*_cols)
         if _fileName is not None:
             self.read_file( _fileName )
+
+        module_logger.debug("MultiMap initialization:")
+        module_logger.debug("filename: %s" % _fileName)
+        module_logger.debug("columns: %s" % (self.columns, ))
+        module_logger.debug("data type: %s" % self.dataType)
 
     def __del__(self):
         module_logger.info("multimap deleted")
@@ -70,7 +90,9 @@ class MultiMap:
         for i in keyw:
             new_data_type.append((i, standardType))
 
-        self.set_data_type( new_data_type )
+        module_logger.debug(new_data_type)
+
+        self.set_data_type(new_data_type)
 
     def set_data_type(self, new_dataType):
         """sets the data type of the internal data storage and
@@ -158,6 +180,22 @@ class MultiMap:
         '''loads content into the MultiMap which was formerly saved as a
         numpy style .npy file'''
         self.data = np.load(filename)
+
+    def get_minimum_value(self, column, absolute = False):
+        '''finds the element in column with the least (absolute) value'''
+        if absolute is True:
+            return np.amin(np.abs(self.data[:][column]))
+        else:
+            return np.amin(self.data[:][column])
+
+    def get_x_of_minimum_value(self, x_column, y_column, absolute = False):
+        '''returns value of x_column where (absolute) of y_column has its
+           minimum'''
+        y_value = self.get_minimum_value(y_column, absolute)
+        restriction = {y_column: y_value}
+        x_values = self.get_column_hard_restriction(x_column, **restriction)
+
+        return (x_values, y_value)
 
     def get_column_by_index(
             self, _col_index, _col2_indices = [], _lambda = None, 
@@ -306,8 +344,8 @@ class MultiMap:
         """
         self.data = np.sort( self.data, order = column )
 
-    def retrieve_2d_plot_data( self, _colx, _coly, errx = None, erry = None, 
-                               restrictions = {} ):
+    def retrieve_2d_plot_data(self, _colx, _coly, errx = None, erry = None, 
+                              restrictions = {}):
         """ TODO has to be rewritten """
         _colx = str(_colx)
         _coly = str(_coly)
@@ -378,33 +416,44 @@ class MultiMap:
         if 'restrictions' in kwargs.keys():
             restrictions = kwargs["restrictions"]
 
+        deletion = False;
+
         data = self.get_subset(restrictions = restrictions)
         data = np.sort(data, order=[_y, _x])
 
         x = np.unique(data[:][_x])
         y = np.unique(data[::-1][_y])
 
+        # for graphene we have to reduce the x-dimension by a factor of 2
+        # TODO: this could be solved in a better way automatically, 
+        # but at the moment only graphene is interesting for me
+        #x = x[::2]
+
         extent = ( x.min(), x.max(), y.min(), y.max() )
 
         X,Y = np.meshgrid( x, y )
-        Z = np.empty(X.shape)
+        Z = np.zeros(X.shape)
+        #Z *= np.nan
+        ##X = np.zeros(Z.shape)
+        ##Y = np.zeros(Z.shape)
         # NOTE missing values rot this reshaping, an additional method for that
         # case is the one commented out below, but this is by far less fast
         if len(data[:][_z]) == X.shape[0]*X.shape[1]:
             Z = data[:][_z].reshape(Y.shape)
         else:
-            module_logger.warning("bad shape of data")
-            for xi in range(Z.shape[0]):
-                for yi in range(Z.shape[1]):
-                    xt = X[xi,yi]
-                    yt = Y[xi,yi]
+            for row in data:
+                xi, = np.where(x == row[_x])[0]
+                yi, = np.where(y == row[_y])[0]
 
-                    selection = data[np.where(data[:][_x] == xt)]
-                    selection = selection[np.where(selection[:][_y] == yt)]
-                    if len(selection) > 0:
-                        Z[xi,yi] = selection[0][_z]
-                    else:
-                        Z[xi,yi] = None
+                X[yi,xi] = row[_x]
+                Y[yi,xi] = row[_y]
+                Z[yi,xi] = row[_z]
+
+                xi += 1
+                
+        g = gauss_kern(2)
+        module_logger.debug(g)
+        Z = ssignal.convolve(Z, g, 'same')
 
         return ( X, Y, Z, extent )
 
