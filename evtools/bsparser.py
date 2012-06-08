@@ -31,7 +31,7 @@ if __name__ == '__main__':
     plt.ylabel(r'$E[t]$')
 
 # organizing the data
-from DataArray import MultiMap, DataArray
+import knodat.multimap as kmm
 
 debug = True
 
@@ -44,7 +44,7 @@ modify_ylim = False
 
 class BSParser:
     def __init__( self, _filename=None ):
-        self.bs = MultiMap()
+        self.bs = kmm.MultiMap()
         self.bands = dict()
 
         if _filename != None:

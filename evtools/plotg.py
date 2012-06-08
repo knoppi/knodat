@@ -85,7 +85,7 @@ def plotg(dataFileName, **opts):
         result = plt.imshow(z, extent = extent, **plot_options)
     else:
         plot_options.update(contour_opts)
-        result = plt.contour(z, extent = extent, **plot_options)
+        result = plt.contour(x, -y, z, extent = extent, **plot_options)
 
     if modify_xlim:
         xlimits = xlim.split( ":" )

@@ -409,6 +409,38 @@ class MultiMap:
                     yerr = yerrs, label = label, fmt = fmt )
         return line
 
+    def create_square_grid(self, _x, _y, **kwargs):
+        restrictions = {}
+        if 'restrictions' in kwargs.keys():
+            restrictions = kwargs["restrictions"]
+
+        data = self.get_subset(restrictions = restrictions)
+        data = np.sort(data, order=[_y, _x])
+
+        x = np.unique(data[:][_x])
+        y = np.unique(data[::-1][_y])
+
+        X,Y = np.meshgrid( x, y )
+        extent = (x.min(), x.max(), y.min(), y.max())
+        return (X, Y, extent)
+
+    def create_graphene_grid(self, _x, _y, **kwargs):
+        restrictions = {}
+        if 'restrictions' in kwargs.keys():
+            restrictions = kwargs["restrictions"]
+
+        data = self.get_subset(restrictions = restrictions)
+        data = np.sort(data, order=[_y, _x])
+
+        x = np.unique(data[:][_x])[::2]
+        y = np.unique(data[::-1][_y])
+
+        data = np.sort(data, order=[_x, _y])
+
+        X,Y = np.meshgrid( x, y )
+        extent = (x.min(), x.max(), y.min(), y.max())
+        return X, Y, extent
+
     def retrieve_3d_plot_data( self, _x, _y, _z, **kwargs ):
         """ returns the needed matrices for creating a matplotlib-like 3d-plot
         """
@@ -421,7 +453,6 @@ class MultiMap:
         data = self.get_subset(restrictions = restrictions)
         data = np.sort(data, order=[_y, _x])
 
-        x = np.unique(data[:][_x])
         y = np.unique(data[::-1][_y])
 
         # for graphene we have to reduce the x-dimension by a factor of 2
@@ -429,21 +460,20 @@ class MultiMap:
         # but at the moment only graphene is interesting for me
         #x = x[::2]
 
-        extent = ( x.min(), x.max(), y.min(), y.max() )
-
-        X,Y = np.meshgrid( x, y )
+        #X,Y = np.meshgrid( x, y )
+        X, Y, extent = self.create_graphene_grid(_x, _y, **kwargs)
         Z = np.zeros(X.shape)
-        #Z *= np.nan
+        Z *= np.nan
         ##X = np.zeros(Z.shape)
         ##Y = np.zeros(Z.shape)
         # NOTE missing values rot this reshaping, an additional method for that
         # case is the one commented out below, but this is by far less fast
-        if len(data[:][_z]) == X.shape[0]*X.shape[1]:
+        if len(data[:][_z]) == Y.shape[0] * Y.shape[1]:
             Z = data[:][_z].reshape(Y.shape)
         else:
             for row in data:
-                xi, = np.where(x == row[_x])[0]
-                yi, = np.where(y == row[_y])[0]
+                xi, = np.where(X[0] == np.floor(row[_x]))[0]
+                yi, = np.where(Y[:,0] == row[_y])[0]
 
                 X[yi,xi] = row[_x]
                 Y[yi,xi] = row[_y]
@@ -451,7 +481,7 @@ class MultiMap:
 
                 xi += 1
                 
-        g = gauss_kern(2)
+        g = gauss_kern(3)
         module_logger.debug(g)
         Z = ssignal.convolve(Z, g, 'same')
 
