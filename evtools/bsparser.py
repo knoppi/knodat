@@ -60,14 +60,14 @@ class BSParser:
             columns.append( ('_b%s' % i ) )
             self.bands[i] = ('_b%s' % i )
 
-        self.bs.setColumnNames( *columns )
-        self.bs.readFile( _filename )
+        self.bs.set_column_names( *columns )
+        self.bs.read_file( _filename )
 
-    def plot(self, color = None, fmt = ""):
-        kvals = self.bs.getColumn( '_k' )
+    def plot(self, color = None, fmt = "", xscaling = 1.0):
+        kvals = xscaling * self.bs.get_column( '_k' )
 
         for iband,band in self.bands.items():
-            Evals = self.bs.getColumn( band )
+            Evals = self.bs.get_column( band )
             if color == None: plt.plot(kvals, Evals, fmt)
             else: plt.plot( kvals, Evals, color = color )
 
@@ -122,7 +122,7 @@ class BSParser:
         # iteration over all the bands
         for i in range( 1, self.number_of_columns+1 ):
             column_name = ( '_b%i' % i )
-            this_band = DataArray( self.bs.getColumn( column_name ) )
+            this_band = DataArray( self.bs.get_column( column_name ) )
 
             lower_bound_of_this_band = this_band.minValue()
             upper_bound_of_this_band = this_band.maxValue()

@@ -94,10 +94,18 @@ class MultiMap:
 
         self.set_data_type(new_data_type)
 
-    def set_data_type(self, new_dataType):
+    def set_data_type(self, new_dataType = "", **listing):
         """sets the data type of the internal data storage and
         creates a new empty np-array"""
-        self.dataType = new_dataType
+        if new_dataType != "":
+            self.dataType = new_dataType
+        else:
+            temp_dType = []
+            for key, val in listing:
+                temp_dType.append((key, val))
+
+            self.dataType = temp_dType
+        
         self.data = np.zeros( 
                 (0, len(new_dataType)), 
                 dtype = new_dataType)

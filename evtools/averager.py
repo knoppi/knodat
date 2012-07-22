@@ -38,7 +38,7 @@ expDecay_params = [100]
 
 def calculateSpinTransmission( dataFileName, 
         columns = ['_L', '_T', '_Tuu', '_Tdu', '_Tud', '_Tdd', '_c1' ],
-        colsToAverage = ["_T",'_Tspin'],
+        colsToAverage = ["_T", '_Tspin', '_Tspin2'],
         colsToFit = ["_T","_Tspin"],
         xCol = "_L",
         shapeTransmission = [err_diffT, err_spinT], 
@@ -57,6 +57,12 @@ def calculateSpinTransmission( dataFileName,
     T.add_column( newName, origin = neededColumns,
             connection = spinTransmission )
 
+    spinTransmission = lambda uu,du : du / uu
+    neededColumns = ['_Tuu', '_Tdu']
+    newName = "_Tspin2"
+    T.add_column( newName, origin = neededColumns,
+            connection = spinTransmission )
+
     return calculateFromObject( T, outfileName,
             colsToAverage = colsToAverage,
             colsToFit = colsToFit, xCol = xCol,
@@ -66,9 +72,13 @@ def calculateSpinTransmission( dataFileName,
 
 def calculateFromObject(T, outfileName, colsToAverage = ["_T"], 
                         colsToFit = ["_T"], xCol = "_L", 
-                        shapeTransmission = [err_diffT], 
-                        shapeParameters = [diffusion_parameters], 
-                        generalInformation = ['_c1']):
+                        shapeTransmission = [], 
+                        shapeParameters = [], 
+                        generalInformation = []):
+                        # war vorher:
+                        #shapeTransmission = [err_diffT], 
+                        #shapeParameters = [diffusion_parameters], 
+                        #generalInformation = ['_c1']):
     O = MultiMap()  # output data
 
     # output columns are
@@ -76,6 +86,7 @@ def calculateFromObject(T, outfileName, colsToAverage = ["_T"],
     for y in colsToAverage:
         output_columns.append( y )
         output_columns.append( "error%s" % y )
+        output_columns.append( "rms%s" % y )
 
     module_logger.debug( ", ".join( output_columns ) )
     O.set_column_names( *output_columns )
@@ -94,7 +105,8 @@ def calculateFromObject(T, outfileName, colsToAverage = ["_T"],
             yaverage = np.average(yvals)
             #yerror   = np.std( yvals )
             yerror   = sem(yvals)
-            outputline.extend([yaverage, yerror])
+            rms = np.sqrt(np.mean((yvals - yaverage)**2))
+            outputline.extend([yaverage, yerror, rms])
 
         O.append_row( outputline )
         #O.appendRow( np.array( tuple( outputline ), ndmin=2 ) )
