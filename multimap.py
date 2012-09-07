@@ -427,11 +427,16 @@ class MultiMap:
         # for graphene we have to reduce the x-dimension by a factor of 2
         # TODO: this could be solved in a better way automatically, 
         # but at the moment only graphene is interesting for me
-        #x = x[::2]
+        T,Y = np.meshgrid(x[::2], y)
+        X = np.zeros(T.shape)
+        X[0::4] = T[0::4]
+        X[1::4] = T[1::4] + 0.5
+        X[2::4] = T[2::4] + 0.5
+        X[3::4] = T[3::4] + 0.5
 
         extent = ( x.min(), x.max(), y.min(), y.max() )
 
-        X,Y = np.meshgrid( x, y )
+        #X,Y = np.meshgrid( x, y )
         Z = np.zeros(X.shape)
         #Z *= np.nan
         ##X = np.zeros(Z.shape)
@@ -442,7 +447,7 @@ class MultiMap:
             Z = data[:][_z].reshape(Y.shape)
         else:
             for row in data:
-                xi, = np.where(x == row[_x])[0]
+                xi = int(np.where(x == row[_x])[0][0] / 2)
                 yi, = np.where(y == row[_y])[0]
 
                 X[yi,xi] = row[_x]
