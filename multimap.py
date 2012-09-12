@@ -292,7 +292,7 @@ class MultiMap:
         new_datatype.append((name, dataType))
 
         if connection == None:
-            newCol = np.zeros((self.data.size,))
+            newCol = [np.zeros((self.data.size,))]
         else:
             arguments = []
             for colname in origin:
@@ -604,3 +604,27 @@ class MultiMap:
         module_logger.warning("using deprecated function getPossibleValues!")
         return self.get_possible_values(colName, **restrictions)
 
+
+if __name__ == "__main__":
+    module_logger.info("create multimap with column a, b and c")
+
+    cols = ["a", "b", "c"]
+    test_object = MultiMap(_cols = cols)
+
+    module_logger.info("multimap created")
+
+    module_logger.info("fill test object with content")
+    test_object.append_row([1, 2, 3])
+    test_object.append_row([4, 5, 6])
+    test_object.append_row([7, 8, 9])
+
+    module_logger.info("test object filled with: %s" % test_object.data)
+
+    module_logger.info("adding column 'd' filled with zeros")
+    test_object.add_column("d")
+    module_logger.info("test object in new state: %s" % test_object.data)
+
+    module_logger.info("adding column 'e' filled with the sum of columns a and b")
+    add = lambda x, y: x + y
+    test_object.add_column("e", origin = ["a", "b"], connection = add)
+    module_logger.info("test object in new state: %s" % test_object.data)
