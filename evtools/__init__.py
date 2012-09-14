@@ -1,3 +1,3 @@
 #!/usr/bin/env python
 
-from multimap import *
+from knodat.multimap import *
