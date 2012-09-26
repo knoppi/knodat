@@ -115,18 +115,18 @@ def calculateFromObject(T, outfileName, colsToAverage = ["_T"],
     O.write_file( outfileName )
 
     result = []
-    result.append( constants )
 
     # do fitting
-    for i in range( len( colsToFit ) ):
+    for i, column in enumerate(colsToFit):
         module_logger.debug("xvals.shape: %s" % (xvals.shape,))
-        #xvals = O.getColumn( xCol )
-        yvals = O.get_column( colsToFit[i] )
+        yvals = O.get_column(column)
         module_logger.debug("yvals.shape: %s" % (yvals.shape,))
-        output, success = optimize.leastsq( shapeTransmission[i],
-                shapeParameters[i], args = ( xvals, yvals ) )
-        result.append( output )
+        output, success = optimize.leastsq(shapeTransmission[i],
+                shapeParameters[i], args = (xvals, yvals))
+        result.append(output)
 
+    #result.append( constants )
+    print result
     return result
 
 def calculate( dataFileName, cols = ['_L','_T','_c1'], 
