@@ -420,7 +420,7 @@ class MultiMap:
                     yerr = yerrs, label = label, fmt = fmt )
         return line
 
-    def retrieve_3d_plot_data( self, _x, _y, _z, **kwargs ):
+    def retrieve_3d_plot_data(self, _x, _y, _z, N = 2, **kwargs):
         """ returns the needed matrices for creating a matplotlib-like 3d-plot
         """
         restrictions = {}
@@ -467,63 +467,77 @@ class MultiMap:
 
                 xi += 1
                 
-        g = gauss_kern(2)
+        g = gauss_kern(N)
         module_logger.debug(g)
         Z = ssignal.convolve(Z, g, 'same')
 
-        return ( X, Y, Z, extent )
+        return (X[::N,::N], Y[::N,::N], Z[::N,::N], extent )
+
+    def retrieve_quiver_plot_data( self, _x, _y, _u, _v, N = 5, **kwargs ):
+        """ for detailed information what a quiver plot is, please read 
+            matplotlib documentation; this method basically returns the data
+            in a format as the matplotlib.pyplot.quiver method understand
+        """
+        restrictions = {}
+        if 'restrictions' in kwargs.keys():
+            restrictions = kwargs["restrictions"]
+
+        deletion = False;
+
+        data = self.get_subset(restrictions = restrictions)
+        data = np.sort(data, order=[_y, _x])
+
+        x = np.unique(data[:][_x])
+        y = np.unique(data[::-1][_y])
+
+        # for graphene we have to reduce the x-dimension by a factor of 2
+        # TODO: this could be solved in a better way automatically, 
+        # but at the moment only graphene is interesting for me
+        T,Y = np.meshgrid(x[::2], y)
+        X = np.zeros(T.shape)
+        X[0::4] = T[0::4]
+        X[1::4] = T[1::4] + 0.5
+        X[2::4] = T[2::4] + 0.5
+        X[3::4] = T[3::4] + 0.5
+
+        extent = ( x.min(), x.max(), y.min(), y.max() )
+
+        U = np.zeros(X.shape)
+        V = np.zeros(X.shape)
+        
+        # NOTE missing values rot this reshaping, an additional method for that
+        # case is the one commented out below, but this is by far less fast
+        if len(data[:][_u]) == X.shape[0]*X.shape[1]:
+            U = data[:][_u].reshape(Y.shape)
+            V = data[:][_v].reshape(Y.shape)
+        else:
+            for row in data:
+                xi = int(np.where(x == row[_x])[0][0] / 2)
+                yi, = np.where(y == row[_y])[0]
+
+                X[yi,xi] = row[_x]
+                Y[yi,xi] = row[_y]
+                U[yi,xi] = row[_u]
+                V[yi,xi] = row[_v]
+
+                xi += 1
+                
+        g = gauss_kern(N, N)
+        #module_logger.debug(g)
+        U = ssignal.convolve(U, g, 'same')
+        V = ssignal.convolve(V, g, 'same')
+
+        X = X[::N,::N]
+        Y = Y[::N,::N]
+        U = U[::N,::N]
+        V = V[::N,::N]
+
+        return (X, Y, U, V, extent)
 
     def retrieveQuiverPlotData( self, _x, _y, _u, _v, **kwargs ):
         """ returns the needed matrices for creating a matplotlib-like 3d-plot 
         """
-        #if debug: before = time()
-        #bin_distance = 5
-        #averaging_range_a = 10
-        #for i in kwargs:
-            #if i == "bin_distance": bin_distance = kwargs[i]
-            #if i == "averaging": averaging_range_a = kwargs[i]
-        #averaging_range_i = max( int( round( averaging_range_a / bin_distance ) ), 1 )
-
-        #xs = DataArray( self.getPossibleValues( _x ) )
-        #ys = DataArray( self.getPossibleValues( _y ) )
-
-        #x = np.arange( xs.minValue() - 1, xs.maxValue() + 1, bin_distance )
-        #y = np.arange( ys.minValue() - 1, ys.maxValue() + 1, bin_distance )
-        #X,Y = np.meshgrid( x, y )
-
-        #bins_U = np.zeros( X.shape )
-        #Ns_U   = np.zeros( X.shape )
-        #bins_V = np.zeros( X.shape )
-        #Ns_V   = np.zeros( X.shape )
-
-        # fill the bins
-        #for row in self:
-            #relative_x = row[ _x ] - x[0]
-            #relative_y = row[ _y ] - y[0]
-
-            #x_central_index = int( round( relative_x / bin_distance ) )
-            #y_central_index = int( round( relative_y / bin_distance ) )
-            #x_min_index = max( 0, x_central_index - averaging_range_i )
-            #y_min_index = max( 0, y_central_index - averaging_range_i )
-            #x_max_index = min( len( x ), x_central_index + averaging_range_i )
-            #y_max_index = min( len( y ), y_central_index + averaging_range_i )
-
-            #current_u = row[ _u ]
-            #current_v = row[ _v ]
-
-            #for x_index in range( x_min_index, x_max_index ):
-                #for y_index in range( y_min_index, y_max_index ):
-                    #bins_V[y_index, x_index] = bins_V[y_index, x_index] + current_v
-                    #Ns_V[y_index, x_index] = Ns_V[y_index, x_index] + 1
-                    #bins_U[y_index, x_index] = bins_U[y_index, x_index] + current_u
-                    #Ns_U[y_index, x_index] = Ns_U[y_index, x_index] + 1
-
-        # finish the U and V calculations
-        #V = bins_V / Ns_V
-        #U = bins_U / Ns_U
-        #if debug: print "time for retreiving vector plot data: ", ( time() - before ), "s"
-
-        #return ( X, Y, U, V )
+        return self.retrieve_quiver_plot_data(_x, _y, _u, _v, **kwargs)
 
     # Old functions kept due to backwards comapbility; will give a warning
     # about deprecation
