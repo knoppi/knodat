@@ -20,15 +20,19 @@ def plotcurr(dataFileName, **opts):
 
     u_col = 2
     v_col = 3
-    c_col = 13
+
+    color_coding = False
+    c_col = 4
+    
+    N = 5
 
     plot_options = {}
     #plot_options["interpolation"] = 'nearest'
     plot_options["cmap"] = my_cm.spin
-    plot_options["angles"] = "xy"
-    plot_options["units"] = "height"
+    #plot_options["angles"] = "xy"
+    #plot_options["units"] = "inches"
     #plot_options["scale_units"] = "width"
-    plot_options["scale"] = 1.0 / 1
+    #plot_options["scale"] = 1.0 / 1e4
 
     contour_opts = {}
 
@@ -38,6 +42,10 @@ def plotcurr(dataFileName, **opts):
         if opt == "--pdf": save_pdf = True
         if opt == "--eps": save_eps = True
         if opt == "--png": save_png = True
+        if opt == "--color":
+            color_coding = True
+            c_col = int(val)
+
         if opt == "--xlim": 
             modify_xlim = True
             xlim = val
@@ -49,7 +57,6 @@ def plotcurr(dataFileName, **opts):
         if opt == "-c":
             u_col = float(val) - 1
             v_col = float(val)
-            c_col = float(val) + 1
         if opt == "-m":
             if val == "spin":
                 plot_options["cmap"] = my_cm.spin
@@ -63,6 +70,9 @@ def plotcurr(dataFileName, **opts):
             zlimits = val.split(":")
             plot_options["vmin"] = float(zlimits[0])
             plot_options["vmax"] = float(zlimits[1])
+
+        if opt == "-N":
+            N = int(val)
 
         if opt == "-b":
             show_colorbar = True
@@ -78,17 +88,20 @@ def plotcurr(dataFileName, **opts):
 
     data = MultiMap(dataFileName)
 
-    x,y,u,v,extent = data.retrieve_quiver_plot_data("1", "2", u_col, v_col, N = 5)
-    x,y,c,extent = data.retrieve_3d_plot_data("1", "2", c_col, N = 5)
+    x,y,u,v,extent = data.retrieve_quiver_plot_data("1", "2", u_col, v_col, N = N)
+    if color_coding:
+        x,y,c,extent = data.retrieve_3d_plot_data("1", "2", c_col, N = N)
 
     print "xrange: ", np.min(x), np.max(x)
     print "yrange: ", np.min(y), np.max(y)
     print "urange: ", np.min(u), np.max(u)
     print "vrange: ", np.min(v), np.max(v)
-    print "crange: ", np.min(c), np.max(c)
 
-    result = plt.quiver(x[:], y[:], u[:], v[:], c[:], **plot_options)
-    #result = plt.quiver(x[:], y[:], u[:], v[:], **plot_options)
+    if color_coding:
+        print "crange: ", np.min(c), np.max(c)
+        result = plt.quiver(x[:], y[:], u[:], v[:], c[:], **plot_options)
+    else:
+        result = plt.quiver(x[:], y[:], u[:], v[:], **plot_options)
 
     if modify_xlim:
         xlimits = xlim.split( ":" )
@@ -127,8 +140,8 @@ def plotcurr(dataFileName, **opts):
 
 
 if __name__ == "__main__":
-    opts, args = getopt.getopt(sys.argv[1:], 'c:m:z:b', 
-                               ['eps','pdf','png','xlim=','ylim=','title='])
+    opts, args = getopt.getopt(sys.argv[1:], 'c:m:z:bN:', 
+                               ['eps','pdf','png','xlim=','ylim=','title=', 'color='])
 
     if len(args) > 0 : dataFileName = args[0]
     else : dataFileName = "scalars.out"

@@ -13,7 +13,7 @@ import knodat.colors as my_cm
 
 def plotg(dataFileName, **opts):
     #ax = plt.axes([0,0,1,1])
-    ax = plt.subplot(111)
+    #ax = plt.subplot(111)
     modify_xlim = False
     modify_ylim = False
     save_pdf = False
@@ -73,7 +73,7 @@ def plotg(dataFileName, **opts):
 
     data = MultiMap(dataFileName)
 
-    x,y,z,extent = data.retrieve_3d_plot_data("1", "2", z_col)
+    x,y,z,extent = data.retrieve_3d_plot_data("1", "2", z_col, N = 1)
 
     print "xrange: ", np.min(x), np.max(x)
     print "yrange: ", np.min(y), np.max(y)
