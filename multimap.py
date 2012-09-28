@@ -468,10 +468,16 @@ class MultiMap:
                 xi += 1
                 
         g = gauss_kern(N)
+        xoffset = (Y.shape[1] % N) / 2
+        yoffset = (Y.shape[0] % N) / 2
         module_logger.debug(g)
         Z = ssignal.convolve(Z, g, 'same')
 
-        return (X[::N,::N], Y[::N,::N], Z[::N,::N], extent )
+        X = X[yoffset::N,xoffset::N]
+        Y = Y[yoffset::N,xoffset::N]
+        Z = Z[yoffset::N,xoffset::N]
+        
+        return (X, Y, Z, extent )
 
     def retrieve_quiver_plot_data( self, _x, _y, _u, _v, N = 5, **kwargs ):
         """ for detailed information what a quiver plot is, please read 
@@ -523,14 +529,16 @@ class MultiMap:
                 xi += 1
                 
         g = gauss_kern(N, N)
+        xoffset = (Y.shape[1] % N) / 2
+        yoffset = (Y.shape[0] % N) / 2
         #module_logger.debug(g)
         U = ssignal.convolve(U, g, 'same')
         V = ssignal.convolve(V, g, 'same')
 
-        X = X[::N,::N]
-        Y = Y[::N,::N]
-        U = U[::N,::N]
-        V = V[::N,::N]
+        X = X[yoffset::N,xoffset::N]
+        Y = Y[yoffset::N,xoffset::N]
+        U = U[yoffset::N,xoffset::N]
+        V = V[yoffset::N,xoffset::N]
 
         return (X, Y, U, V, extent)
 
