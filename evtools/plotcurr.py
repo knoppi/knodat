@@ -145,7 +145,7 @@ if __name__ == "__main__":
                                    'ylim=','title=', 'color=',
                                    'scale='])
 
-        fig = plt.figure()
+        fig = plt.figure(figsize=(20,5))
         ax = fig.add_subplot(111, frame_on = False)
 
         opts = dict(opts)

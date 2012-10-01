@@ -7,6 +7,7 @@ import matplotlib.ticker as mticker
 import os
 import sys
 import getopt
+import textwrap
 
 from knodat.multimap import *
 import knodat.colors as my_cm
@@ -20,6 +21,7 @@ def plotg(dataFileName, **opts):
     save_eps = False
     save_png = False
     show_colorbar = False
+    show_grid = False
 
     z_col = 2
 
@@ -28,6 +30,8 @@ def plotg(dataFileName, **opts):
     plot_options["interpolation"] = 'nearest'
 
     contour_opts = {}
+    
+    N = 1
 
     plot_mode = "image"
 
@@ -70,14 +74,26 @@ def plotg(dataFileName, **opts):
             levels = [float(x) for x in levels]
             contour_opts["levels"] = levels
 
+        if opt == "-N":
+            N = int(val)
+
+        if opt == "--interpolation":
+            plot_options["interpolation"] = val
+
+        if opt == "-g" or opt == "--grid":
+            show_grid = True
+
 
     data = MultiMap(dataFileName)
 
-    x,y,z,extent = data.retrieve_3d_plot_data("1", "2", z_col, N = 1)
+    x,y,z,extent = data.retrieve_3d_plot_data("1", "2", z_col, N = N)
 
     print "xrange: ", np.min(x), np.max(x)
     print "yrange: ", np.min(y), np.max(y)
     print "zrange: ", np.min(z), np.max(z)
+
+    if show_grid is True:
+        plt.plot(x, y, "k,")
 
     #z = np.ma.masked_array(z, mask=np.isnan(z))
     result = ""
@@ -123,19 +139,52 @@ def plotg(dataFileName, **opts):
     return result
 
 if __name__ == "__main__":
-    opts, args = getopt.getopt(sys.argv[1:], 'c:m:z:b', 
-                               ['eps','pdf','png','xlim=','ylim=','title='])
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], 'c:m:z:bN:g', 
+                                   ['eps','pdf','png','xlim=','ylim=','title=',
+                                       'interpolation=', 'grid'])
 
-    if len(args) > 0 : dataFileName = args[0]
-    else : dataFileName = "scalars.out"
+        if len(args) > 0 : dataFileName = args[0]
+        else : dataFileName = "scalars.out"
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111, frame_on = False)
+        fig = plt.figure(figsize=(20,5))
+        ax = fig.add_subplot(111, frame_on = False)
 
-    opts = dict(opts)
-    plotg(dataFileName, **opts)
+        opts = dict(opts)
+        plotg(dataFileName, **opts)
 
-    ax.xaxis.set_major_locator(mticker.NullLocator())
-    ax.yaxis.set_major_locator(mticker.NullLocator())
+        ax.xaxis.set_major_locator(mticker.NullLocator())
+        ax.yaxis.set_major_locator(mticker.NullLocator())
 
-    plt.show()
+        plt.show()
+    except getopt.GetoptError:
+        print textwrap.dedent("""\
+        Usage: plotg.py [OPTIONS] ... datafilename
+        Creates a color-coded image plot according to x,y and z data found in 
+        'datafilename' in particular columns
+
+        Mandatory arguments to long options are mandatory for short options too.
+        -c, --col=NUMBER            use the columns NUMBER for z
+        -N=BINS                     average over BINS data points, effectively reducing
+                                    the number of datapoint for the plot
+            --interpolation=NAME    the name of an allowed interpolation method of
+                                    the pyplot.imshow method, currently allowed values
+                                    are: 'nearest', 'bilinear', 'bicubic', 'spline16', 
+                                    'spline36', 'hanning', 'hamming', 'hermite', 
+                                    'kaiser', 'quadric', 'catrom', 'gaussian', 'bessel', 
+                                    'mitchell', 'sinc', 'lanczos'
+                                    Defaults to nearest
+        -b                          plot a colorbar-legend
+        -g, --grid                  plot the grid behind the color-image
+        -m=NAME                     the NAME of the desired colormap, possible values are
+                                    spin, hot, gray and jet
+        -z LOWER:UPPER              limits the z-axis to a given range
+            --eps                   saves the plot as an eps file
+            --pdf                   saves the plot as a pdf file
+            --png                   saves the plot as a png file
+            --xlim=LOWER:UPPER
+            --ylim=LOWER:UPPER
+            --title=STRING
+            --interpolation
+        """)
+
