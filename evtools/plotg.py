@@ -140,16 +140,23 @@ def plotg(dataFileName, **opts):
 
 if __name__ == "__main__":
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'c:m:z:bN:g', 
+        opts, args = getopt.getopt(sys.argv[1:], 'c:m:z:bN:gf:', 
                                    ['eps','pdf','png','xlim=','ylim=','title=',
-                                       'interpolation=', 'grid'])
+                                       'interpolation=', 'grid','figsize='])
+
+        figsize = (20, 5)
+        for opt,val in opts:
+            if opt == "-f" or opt == "--figsize":
+                tmp = val.split(",")
+                figsize = tuple([float(x) for x in tmp])
+
+        fig = plt.figure(figsize=figsize)
+
+        ax = fig.add_subplot(111, frame_on = False)
 
         if len(args) > 0 : dataFileName = args[0]
         else : dataFileName = "scalars.out"
-
-        fig = plt.figure(figsize=(20,5))
-        ax = fig.add_subplot(111, frame_on = False)
-
+       
         opts = dict(opts)
         plotg(dataFileName, **opts)
 
@@ -186,5 +193,7 @@ if __name__ == "__main__":
             --ylim=LOWER:UPPER
             --title=STRING
             --interpolation
+        -f, --figsize=W,H           Width and Height of the produced figure in inches
+                                    default is 20"x5"
         """)
 

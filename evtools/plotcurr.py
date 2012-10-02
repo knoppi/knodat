@@ -140,12 +140,18 @@ def plotcurr(dataFileName, **opts):
 
 if __name__ == "__main__":
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'c:m:z:bN:s:', 
+        opts, args = getopt.getopt(sys.argv[1:], 'c:m:z:bN:s:f:', 
                                ['col=','eps','pdf','png','xlim=',
                                    'ylim=','title=', 'color=',
-                                   'scale='])
+                                   'scale=','figsize='])
 
-        fig = plt.figure(figsize=(20,5))
+        figsize = (20, 5)
+        for opt,val in opts.items():
+            if opt == "-f" or opt == "--figsize":
+                tmp = val.splot(",")
+                figsize = tuple([float(x) for x in tmp])
+
+        fig = plt.figure(figsize=figsize)
         ax = fig.add_subplot(111, frame_on = False)
 
         opts = dict(opts)
@@ -177,5 +183,7 @@ if __name__ == "__main__":
             --xlim=LOWER:UPPER
             --ylim=LOWER:UPPER
             --title=STRING
+        -f, --figsize=W,H               Width and Height of the produced figure in inches
+                                        default is 20"x5"
         """)
 
