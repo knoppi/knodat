@@ -125,7 +125,7 @@ def calculateFromObject(T, outfileName, colsToAverage = ["_T"],
         result.append(output)
 
     #result.append( constants )
-    print result
+    #print result
     return result
 
 def calculate( dataFileName, cols = ['_L','_T','_c1'], 

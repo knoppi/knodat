@@ -5,6 +5,7 @@ import matplotlib.ticker as mticker
 import os
 import sys
 import getopt
+import textwrap
 
 from knodat.multimap import *
 import knodat.colors as my_cm
@@ -27,16 +28,18 @@ def plotcurr(dataFileName, **opts):
     N = 5
 
     plot_options = {}
-    #plot_options["interpolation"] = 'nearest'
-    plot_options["cmap"] = my_cm.spin
-    #plot_options["angles"] = "xy"
-    #plot_options["units"] = "inches"
-    #plot_options["scale_units"] = "width"
-    #plot_options["scale"] = 1.0 / 1e4
 
-    contour_opts = {}
+    quiver_plot_options = {}
+    quiver_plot_options["units"] = "height"
+    quiver_plot_options["width"] = 0.002
+    #quiver_plot_options["headlength"] = 3
+    #quiver_plot_options["headaxislength"] = 2.5
+    quiver_plot_options["scale"] = 1
+    #quiver_plot_options["headwidth"] = 3
+    quiver_plot_options["pivot"] = "middle"
 
-    plot_mode = "image"
+    color_plot_options = {}
+    color_plot_options["cmap"] = my_cm.spin
 
     for opt,val in opts.items():
         if opt == "--pdf": save_pdf = True
@@ -68,8 +71,8 @@ def plotcurr(dataFileName, **opts):
                 plot_options["cmap"] = cm.jet
         if opt == "-z":
             zlimits = val.split(":")
-            plot_options["vmin"] = float(zlimits[0])
-            plot_options["vmax"] = float(zlimits[1])
+            color_plot_options["vmin"] = float(zlimits[0])
+            color_plot_options["vmax"] = float(zlimits[1])
 
         if opt == "-N":
             N = int(val)
@@ -77,31 +80,27 @@ def plotcurr(dataFileName, **opts):
         if opt == "-b":
             show_colorbar = True
 
-        if opt == "--contour":
-            plot_mode = "contour"
-
-        if opt == "--levels":
-            levels = val.split(":")
-            levels = [float(x) for x in levels]
-            contour_opts["levels"] = levels
-
+        if opt == "-s" or opt == "--scale":
+            quiver_plot_options["scale"] = 1 / float(val)
 
     data = MultiMap(dataFileName)
 
+    # this is getting the data for the quiverplot
     x,y,u,v,extent = data.retrieve_quiver_plot_data("1", "2", u_col, v_col, N = N)
-    if color_coding:
-        x,y,c,extent = data.retrieve_3d_plot_data("1", "2", c_col, N = N)
-
     print "xrange: ", np.min(x), np.max(x)
     print "yrange: ", np.min(y), np.max(y)
     print "urange: ", np.min(u), np.max(u)
     print "vrange: ", np.min(v), np.max(v)
 
     if color_coding:
+        x,y,c,extent = data.retrieve_3d_plot_data("1", "2", c_col, N = N)
         print "crange: ", np.min(c), np.max(c)
-        result = plt.quiver(x[:], y[:], u[:], v[:], c[:], **plot_options)
-    else:
-        result = plt.quiver(x[:], y[:], u[:], v[:], **plot_options)
+        options = dict(plot_options, **color_plot_options)
+        plt.imshow(c, extent = extent, **options)
+
+
+    options = dict(plot_options, **quiver_plot_options)
+    result = plt.quiver(x[:], y[:], u[:], v[:], **options)
 
     if modify_xlim:
         xlimits = xlim.split( ":" )
@@ -140,21 +139,43 @@ def plotcurr(dataFileName, **opts):
 
 
 if __name__ == "__main__":
-    opts, args = getopt.getopt(sys.argv[1:], 'c:m:z:bN:', 
-                               ['eps','pdf','png','xlim=','ylim=','title=', 'color='])
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], 'c:m:z:bN:s:', 
+                               ['col=','eps','pdf','png','xlim=',
+                                   'ylim=','title=', 'color=',
+                                   'scale='])
 
-    if len(args) > 0 : dataFileName = args[0]
-    else : dataFileName = "scalars.out"
+        fig = plt.figure(figsize=(20,5))
+        ax = fig.add_subplot(111, frame_on = False)
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111, frame_on = False)
+        opts = dict(opts)
+        
+        if len(args) > 0 : dataFileName = args[0]
+        else : dataFileName = "scalars.out"
+       
+        plotcurr(dataFileName, **opts)
 
-    opts = dict(opts)
-    plotcurr(dataFileName, **opts)
+        plt.axis("equal")
+        plt.show()
+    except getopt.GetoptError:
+        print textwrap.dedent("""\
+        Usage: plotcurr.py [OPTIONS] ... datafilename
+        Creates a vector-field plot according to x,y and u,v data found in 
+        'datafilename' in particular columns
 
-    plt.axis("equal")
+        Mandatory arguments to long options are mandatory for short options too.
+        -c, --col=NUMBER    use the columns beginning from column NUMBER for u and v
+            --color=COLUMN   color-code the arrows by some shading given by column COLUMN
+        -N=bins                 average over a
+        -b
+        -s, --scale=FACTOR  changes the arrow size by FACTOR
+        -m=NAME
+        -z
+            --eps
+            --pdf
+            --png
+            --xlim=LOWER:UPPER
+            --ylim=LOWER:UPPER
+            --title=STRING
+        """)
 
-    #ax.xaxis.set_major_locator(mticker.NullLocator())
-    #ax.yaxis.set_major_locator(mticker.NullLocator())
-
-    plt.show()
