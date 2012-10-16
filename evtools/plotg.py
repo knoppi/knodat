@@ -108,6 +108,7 @@ def plotg(dataFileName, **opts):
 
         if opt == "--noaspect":
             del plot_options["extent"]
+            plot_options["aspect"] = "auto"
 
     # a second run for options that might need the procession of another option
     # already before they are processed
