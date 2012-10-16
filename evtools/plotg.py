@@ -14,8 +14,7 @@ from knodat.multimap import *
 import knodat.colors as my_cm
 
 def plotg(dataFileName, **opts):
-    #ax = plt.axes([0,0,1,1])
-    #ax = plt.subplot(111)
+    # Variables perhaps modified by **opts
     modify_xlim = False
     modify_ylim = False
     save_pdf = False
@@ -24,16 +23,22 @@ def plotg(dataFileName, **opts):
     show_colorbar = False
     show_grid = False
 
+    # the default column, note that col-numbering is
+    # 0 1 2 ...
     z_col = 2
 
+    # the dict with the plotting options
     plot_options = {}
     plot_options["cmap"] = cm.jet
     plot_options["interpolation"] = 'nearest'
 
+    # same for the contour plot extra options
     contour_opts = {}
     
+    # range of the Gaussian convolution for numerical interpolation
     N = 1
 
+    # by default we plot a color-coded image, contour is also possible
     plot_mode = "image"
 
     # processing of options that are needed to fetch the data
@@ -45,9 +50,10 @@ def plotg(dataFileName, **opts):
 
     # fetch the data
     data = MultiMap(dataFileName)
-
     x,y,z,extent = data.retrieve_3d_plot_data("1", "2", z_col, N = N)
+    plot_options["extent"] = extent
 
+    # the following data is useful in every case
     print "xrange: ", np.min(x), np.max(x)
     print "yrange: ", np.min(y), np.max(y)
     plot_options["vmin"] = np.min(z)
@@ -57,9 +63,12 @@ def plotg(dataFileName, **opts):
 
     # process options for the creation of the plot
     for opt,val in opts.items():
-        if opt == "--pdf": save_pdf = True
-        if opt == "--eps": save_eps = True
-        if opt == "--png": save_png = True
+        if opt == "--pdf": 
+            save_pdf = True
+        if opt == "--eps": 
+            save_eps = True
+        if opt == "--png": 
+            save_png = True
         if opt == "--xlim": 
             modify_xlim = True
             xlim = val
@@ -84,20 +93,21 @@ def plotg(dataFileName, **opts):
 
         if opt == "-b":
             show_colorbar = True
+        if opt == "--interpolation":
+            plot_options["interpolation"] = val
 
         if opt == "--contour":
             plot_mode = "contour"
-
         if opt == "--levels":
             levels = val.split(":")
             levels = [float(x) for x in levels]
             contour_opts["levels"] = levels
 
-        if opt == "--interpolation":
-            plot_options["interpolation"] = val
-
         if opt == "-g" or opt == "--grid":
             show_grid = True
+
+        if opt == "--noaspect":
+            del plot_options["extent"]
 
     # a second run for options that might need the procession of another option
     # already before they are processed
@@ -106,13 +116,13 @@ def plotg(dataFileName, **opts):
             plot_options["norm"] = mcolors.LogNorm(
                     plot_options["vmin"], plot_options["vmax"])
 
-
     if show_grid is True:
         plt.plot(x, y, "k,")
 
     result = ""
     if plot_mode is "image":
-        result = plt.imshow(z, extent = extent, **plot_options)
+        result = plt.imshow(z, 
+                **plot_options)
     else:
         plot_options.update(contour_opts)
         result = plt.contour(x, -y, z, extent = extent, **plot_options)
@@ -185,15 +195,16 @@ def usage():
         --title=STRING
     -l, --logarithmic           make a logarithmic color-coding
         --interpolation
+    -n, --noaspect              aspect ratio of the data is not kept
     -h, --help                  shows this explanation
     """)
 
 if __name__ == "__main__":
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'c:m:z:bN:glh', 
+        opts, args = getopt.getopt(sys.argv[1:], 'c:m:z:bN:glhn', 
                                    ['eps','pdf','png','xlim=','ylim=','title=',
                                        'interpolation=', 'grid', "logarithmic",
-                                       "help"])
+                                       "help", "noaspect"])
 
         if ("--help", '') in opts:
             raise getopt.GetoptError("")
