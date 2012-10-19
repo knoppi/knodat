@@ -409,12 +409,16 @@ class MultiMap:
                     yerr = yerrs, label = label, fmt = fmt )
         return line
 
-    def retrieve_3d_plot_data(self, _x, _y, _z, N = 2, **kwargs):
+    def retrieve_3d_plot_data(self, _x, _y, _z, N = 2, *args, **kwargs):
         """ returns the needed matrices for creating a matplotlib-like 3d-plot
         """
         restrictions = {}
         if 'restrictions' in kwargs.keys():
             restrictions = kwargs["restrictions"]
+
+        grid = 'square'
+        if 'grid' in kwargs.keys():
+            grid = kwargs['grid']
 
         deletion = False;
 
@@ -427,12 +431,18 @@ class MultiMap:
         # for graphene we have to reduce the x-dimension by a factor of 2
         # TODO: this could be solved in a better way automatically, 
         # but at the moment only graphene is interesting for me
-        T,Y = np.meshgrid(x[::2], y)
-        X = np.zeros(T.shape)
-        X[0::4] = T[0::4]
-        X[1::4] = T[1::4] + 0.5
-        X[2::4] = T[2::4] + 0.5
-        X[3::4] = T[3::4] + 0.5
+        X = np.zeros((1,1))
+        Y = np.zeros((1,1))
+        if grid == 'graphenegrid':
+            module_logger.debug('assuming graphene grid')
+            T,Y = np.meshgrid(x[::2], y)
+            X[0::4] = T[0::4]
+            X[1::4] = T[1::4] + 0.5
+            X[2::4] = T[2::4] + 0.5
+            X[3::4] = T[3::4] + 0.5
+        else:
+            module_logger.debug('assuming square grid')
+            X,Y = np.meshgrid(x, y)
 
         extent = ( x.min(), x.max(), y.min(), y.max() )
 
@@ -447,7 +457,11 @@ class MultiMap:
             Z = data[:][_z].reshape(Y.shape)
         else:
             for row in data:
-                xi = int(np.where(x == row[_x])[0][0] / 2)
+                xi = 0
+                if grid == 'graphenegrid':
+                    xi = int(np.where(x == row[_x])[0][0] / 2)
+                else:
+                    xi = int(np.where(x == row[_x])[0][0])
                 yi, = np.where(y == row[_y])[0]
 
                 X[yi,xi] = row[_x]
@@ -456,15 +470,18 @@ class MultiMap:
 
                 xi += 1
                 
-        g = gauss_kern(N)
-        xoffset = (Y.shape[1] % N) / 2
-        yoffset = (Y.shape[0] % N) / 2
-        module_logger.debug(g)
-        Z = ssignal.convolve(Z, g, 'same')
+        xoffset = 0
+        yoffset = 0
+        if N > 1:
+            g = gauss_kern(N)
+            xoffset = (Y.shape[1] % N) / 2
+            yoffset = (Y.shape[0] % N) / 2
+            module_logger.debug(g)
+            Z = ssignal.convolve(Z, g, 'same')
 
-        X = X[yoffset::N,xoffset::N]
-        Y = Y[yoffset::N,xoffset::N]
-        Z = Z[yoffset::N,xoffset::N]
+            X = X[yoffset::N,xoffset::N]
+            Y = Y[yoffset::N,xoffset::N]
+            Z = Z[yoffset::N,xoffset::N]
         
         return (X, Y, Z, extent )
 

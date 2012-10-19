@@ -5,13 +5,157 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.ticker as mticker
 import matplotlib.colors as mcolors
+import matplotlib.cbook as mcbook
 import os
 import sys
 import getopt
 import textwrap
+import logging
 
 from knodat.multimap import *
 import knodat.colors as my_cm
+
+module_logger = logging.getLogger("PLOTG")
+formatter = logging.Formatter(
+        fmt = "%(relativeCreated)d -- %(name)s -- %(levelname)s -- %(message)s" )
+
+fh = logging.FileHandler( 'eval.log' )
+fh.setFormatter( formatter )
+fh.setLevel( logging.DEBUG )
+
+#logger.addHandler( fh )
+
+ch = logging.StreamHandler()
+ch.setLevel( logging.DEBUG )
+
+module_logger.addHandler( ch )
+
+module_logger.setLevel( logging.DEBUG )
+
+
+class BiLogNorm(mcolors.Normalize):
+    """
+    Normalize a given value to the 0-1 range on a two-sided log scale,
+    i.e. a values distance from the central value (vmax-vmin)/2
+    """
+    def __init__(self, vmin=None, vmax=None, clip=False, cutoff = 1.0e-20):
+        """
+        If *vmin* or *vmax* is not given, they are taken from the input's
+        minimum and maximum value respectively.  If *clip* is *True* and
+        the given value falls outside the range, the returned value
+        will be 0 or 1, whichever is closer. Returns 0 if::
+
+        vmin==vmax
+
+        Works with scalars or arrays, including masked arrays.  If
+        *clip* is *True*, masked values are set to 1; otherwise they
+        remain masked.  Clipping silently defeats the purpose of setting
+        the over, under, and masked colors in the colormap, so it is
+        likely to lead to surprises; therefore the default is
+        *clip* = *False*.
+        """
+        self.vmin = vmin
+        self.vmax = vmax
+        self.clip = clip
+        self.cutoff = cutoff
+
+    def __call__(self, value, clip=None):
+        if clip is None:
+            clip = self.clip
+
+        result, is_scalar = self.process_value(value)
+
+        #result = np.ma.masked_less_equal(result, 0, copy=False)
+
+        self.autoscale_None(result)
+        vmin, vmax = self.vmin, self.vmax
+        if vmin > vmax:
+            raise ValueError("minvalue must be less than or equal to maxvalue")
+        elif vmin==vmax:
+            result.fill(0)
+        else:
+            if clip:
+                mask = np.ma.getmask(result)
+                val = np.ma.array(np.clip(result.filled(vmax), vmin, vmax),
+                                mask=mask)
+            
+            # calculate the central point to create to masks
+            c = (vmax + vmin) / 2.0
+            cutoff = self.cutoff
+
+            shift = np.log10(c - vmin) - np.log10(cutoff)
+            
+            # two masked arrays for keeping the datapoints below or
+            # above the central point respectively
+            resdat = result.data
+            mask1 = result.mask
+            mask2 = result.mask
+            mask3 = result.mask
+
+            if mask1 is np.ma.nomask:
+                mask1 = (resdat < c + cutoff)
+                mask2 = (resdat > c - cutoff)
+                mask3 = np.ma.masked_outside(resdat, c-cutoff, c+cutoff).mask
+            else:
+                mask1 |= resdat > c + cutoff
+                mask2 |= resdat < c - cutoff
+            values1 = np.ma.array(result, mask = mask1)
+            values2 = np.ma.array(result, mask = mask2)
+            values3 = np.ma.array(result, mask = mask3)
+
+            # now do the transformation for the upper branch
+            values1 -= c
+            values2 *= -1
+            values2 += c
+            np.log10(result, result)
+            #np.log10(values1, values1)
+            #np.log10(values2, values2)
+            values1 -= np.log10(cutoff)
+            values2 -= np.log10(cutoff)
+            values2 *= -1
+
+            # and the transformation for the lower branch
+            #module_logger.debug("second masked array after rescaling = %s" % values2[0][::50])
+
+            #values3 = np.ma.array(np.ones(values3.shape),mask=values3.mask)*0.5
+            np.ma.fix_invalid(values3, copy = False, fill_value = 0.0)
+
+            result += shift
+            result /= 2
+            result /= shift
+
+        if is_scalar:
+            result = result[0]
+        return result
+
+    def inverse(self, value):
+        if not self.scaled():
+            raise ValueError("Not invertible until scaled")
+        vmin, vmax = self.vmin, self.vmax
+
+        if cbook.iterable(value):
+            val = ma.asarray(value)
+            return vmin * ma.power((vmax/vmin), val)
+        else:
+            return vmin * pow((vmax/vmin), value)
+
+    def autoscale(self, A):
+        '''
+        Set *vmin*, *vmax* to min, max of *A*.
+        '''
+        A = ma.masked_less_equal(A, 0, copy=False)
+        self.vmin = ma.min(A)
+        self.vmax = ma.max(A)
+
+    def autoscale_None(self, A):
+        ' autoscale only None-valued vmin or vmax'
+        if self.vmin is not None and self.vmax is not None:
+            return
+        A = ma.masked_less_equal(A, 0, copy=False)
+        if self.vmin is None:
+            self.vmin = np.ma.min(A)
+        if self.vmax is None:
+            self.vmax = np.ma.max(A)
 
 def plotg(dataFileName, **opts):
     # Variables perhaps modified by **opts
@@ -50,7 +194,7 @@ def plotg(dataFileName, **opts):
 
     # fetch the data
     data = MultiMap(dataFileName)
-    x,y,z,extent = data.retrieve_3d_plot_data("1", "2", z_col, N = N)
+    x,y,z,extent = data.retrieve_3d_plot_data("1", "2", z_col, grid = 'graphene', N = N)
     plot_options["extent"] = extent
 
     # the following data is useful in every case
@@ -116,6 +260,14 @@ def plotg(dataFileName, **opts):
         if opt == "-l" or opt == "--logarithmic":
             plot_options["norm"] = mcolors.LogNorm(
                     plot_options["vmin"], plot_options["vmax"])
+        if opt == "--bilogarithmic":
+            if val == '':
+                plot_options["norm"] = BiLogNorm(
+                        plot_options["vmin"], plot_options["vmax"])
+            else:
+                plot_options["norm"] = BiLogNorm(
+                        plot_options["vmin"], plot_options["vmax"],
+                        cutoff = float(val))
 
     if show_grid is True:
         plt.plot(x, y, "k,")
@@ -195,6 +347,10 @@ def usage():
         --ylim=LOWER:UPPER
         --title=STRING
     -l, --logarithmic           make a logarithmic color-coding
+        --bilogarithmic CUTOFF  uhh, hard to explain, logarithmic scale but to two 
+                                sides, measuring the distance from a central point
+                                Be careful that the data points are not to close
+                                to the central point
         --interpolation
     -n, --noaspect              aspect ratio of the data is not kept
     -h, --help                  shows this explanation
@@ -205,7 +361,7 @@ if __name__ == "__main__":
         opts, args = getopt.getopt(sys.argv[1:], 'c:m:z:bN:glhn', 
                                    ['eps','pdf','png','xlim=','ylim=','title=',
                                        'interpolation=', 'grid', "logarithmic",
-                                       "help", "noaspect"])
+                                       "help", "noaspect",'bilogarithmic='])
 
         if ("--help", '') in opts:
             raise getopt.GetoptError("")
