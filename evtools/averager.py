@@ -2,15 +2,14 @@
 # -*- coding: utf-8 -*-
 
 import logging
-module_logger = logging.getLogger( "evaluation.averaging" )
-
-from MultiMap import MultiMap
-
 from scipy import *
 from scipy import optimize
 import numpy as np
 from scipy.stats import sem
 
+import knodat.multimap as kmm
+
+module_logger = logging.getLogger( "evaluation.averaging" )
 # constants of a transmission curve (like number of channels) can be 
 # stored here
 constants = {}
@@ -79,7 +78,7 @@ def calculateFromObject(T, outfileName, colsToAverage = ["_T"],
                         #shapeTransmission = [err_diffT], 
                         #shapeParameters = [diffusion_parameters], 
                         #generalInformation = ['_c1']):
-    O = MultiMap()  # output data
+    O = kmm.MultiMap()  # output data
 
     # output columns are
     output_columns = [xCol]

@@ -297,17 +297,28 @@ class MultiMap:
             arguments = []
             for colname in origin:
                 arguments.append(self.data[:][colname])
+                module_logger.debug("argument: %s" % self.data[:][colname])
             newCol = connection(*arguments)
             newCol = [newCol]
 
+        module_logger.debug("new column: %s" % newCol)
+
+        new_shape = (self.data.shape[0], len(self.dataType))
+        module_logger.debug("new shape: %s" % (new_shape, ))
+
         # do some strange transformation which should be faster than
         # iterating over the rows
+        module_logger.debug("reshaping...")
         self.data = np.array(self.data.tolist())
-        self.data = self.data.transpose()
-        self.data = np.append(self.data, newCol, axis = 0)
-        self.data = self.data.transpose()
-        self.data = np.rec.fromrecords(self.data, dtype = new_datatype)
-        self.data = np.array(self.data)
+        self.data = self.data.flatten('F')
+        module_logger.debug("new structure: %s" % self.data)
+        self.data = np.append(self.data, newCol)
+        module_logger.debug("with new data: %s" % self.data)
+        self.data = self.data.reshape(new_shape, order = "F")
+        module_logger.debug("shaped back: %s" % self.data)
+        tmp = [tuple(x) for x in self.data]
+        module_logger.debug("temporary object: %s" % tmp)
+        self.data = np.array(tmp, dtype = new_datatype, order = "F")
 
         self.dataType = new_datatype
         self.columns.append(name)
@@ -645,6 +656,7 @@ class MultiMap:
 
 
 if __name__ == "__main__":
+    ch.setLevel(logging.DEBUG)
     module_logger.info("create multimap with column a, b and c")
 
     cols = ["a", "b", "c"]
