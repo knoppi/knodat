@@ -68,6 +68,9 @@ class MultiMap:
             tmp[self.columns[j]] = self.data[i,j]
         return tmp
 
+    def __iter__(self):
+        return iter(self.data)
+
     def getitem( self, i ):
         """ retrieve a single row of the MultiMap as a dict """
         self.__getitem__( i )
@@ -132,6 +135,7 @@ class MultiMap:
             file_id = open(filename,'rb')
             first_row = file_id.readline()
             if first_row[0:2] == "##":
+                module_logger.debug('taking column names from first line')
                 column_names = first_row[3:(len(first_row) - 1)].split(" ")
                 self.set_column_names(*column_names)
             else:

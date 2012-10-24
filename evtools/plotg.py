@@ -244,7 +244,7 @@ def plotg(dataFileName, **opts):
             plot_mode = "contour"
         if opt == "--levels":
             levels = val.split(":")
-            levels = [float(x) for x in levels]
+            levels = [float(t) for t in levels]
             contour_opts["levels"] = levels
 
         if opt == "-g" or opt == "--grid":
@@ -278,7 +278,7 @@ def plotg(dataFileName, **opts):
                 **plot_options)
     else:
         plot_options.update(contour_opts)
-        result = plt.contour(x, -y, z, extent = extent, **plot_options)
+        result = plt.contour(x, y, z, **plot_options)
 
     if modify_xlim:
         xlimits = xlim.split( ":" )
@@ -287,6 +287,8 @@ def plotg(dataFileName, **opts):
     if modify_ylim:
         ylimits = ylim.split( ":" )
         plt.ylim( float( ylimits[0] ), float( ylimits[1] ) )
+
+    ax = plt.gca()
     
     if show_colorbar is True:
         cax = plt.axes([0.7,0.1,0.18,0.08])

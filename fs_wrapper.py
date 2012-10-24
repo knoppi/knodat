@@ -41,7 +41,7 @@ def extractParametersFromFilename( filename ):
             "using deprecated function extractParametersFromFilename!")
     return extract_parameters_from_filename(filename)
 
-def extract_parameters_from_filename( filename ):
+def extract_parameters_from_filename(filename, tail = 1):
     """ Takes a given filename and returns an array with extracted parameters
     filename is the name given to numerical output according to some fixed 
     scheme. Parts of the filename are separated by unsderscores "_", decimal 
@@ -64,7 +64,7 @@ def extract_parameters_from_filename( filename ):
 
     information = filename.split( "_" )
     results = {}
-    for i in range( len( information ) / 2 - 1 ):
+    for i in range( (len(information) - tail) / 2 ):
         key = information[ 2 * i + 1 ]
         value =  float( information[ 2 * i + 2 ].replace( "p","." ) )
         results[ key ] = value
