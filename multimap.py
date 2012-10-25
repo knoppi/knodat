@@ -51,7 +51,10 @@ class MultiMap:
         if not _cols == None:
             self.set_column_names(*_cols)
         if _fileName is not None:
-            self.read_file( _fileName )
+            if _fileName[-4:] == '.npy':
+                self.read_file_numpy_style(_fileName)
+            else:
+                self.read_file( _fileName )
 
         module_logger.debug("MultiMap initialization:")
         module_logger.debug("filename: %s" % _fileName)
