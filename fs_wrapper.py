@@ -41,7 +41,7 @@ def extractParametersFromFilename( filename ):
             "using deprecated function extractParametersFromFilename!")
     return extract_parameters_from_filename(filename)
 
-def extract_parameters_from_filename(filename, tail = 1):
+def extract_parameters_from_filename(filename, tail = 2):
     """ Takes a given filename and returns an array with extracted parameters
     filename is the name given to numerical output according to some fixed 
     scheme. Parts of the filename are separated by unsderscores "_", decimal 

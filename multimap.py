@@ -21,13 +21,22 @@ ch = logging.StreamHandler()
 ch.setFormatter(formatter)
 ch.setLevel(logging.WARNING)
 #ch.setLevel(logging.DEBUG)
+ch.setLevel(logging.WARNING)
 
 module_logger.addHandler(ch)
 
-module_logger.setLevel(logging.DEBUG)
+module_logger.setLevel(logging.WARNING)
 
 # define a global zero
 ZERO = 1E-6
+
+def set_debug_level(level):
+    possible_levels = dict(debug = logging.DEBUG, info = logging.INFO,
+            warning = logging.WARNING, error = logging.ERROR,
+            fatal = logging.FATAL)
+    ch.setLevel(possible_levels[level])
+    module_logger.setLevel(possible_levels[level])
+
 
 def gauss_kern(size, sizey=None):
     """ Returns a normalized 2D gauss kernel array for convolutions """
@@ -39,6 +48,15 @@ def gauss_kern(size, sizey=None):
         sizey = int(sizey)
     x, y = np.mgrid[-size:size+1, -sizey:sizey+1]
     g = np.exp(-(x**2/float(size)+y**2/float(sizey)))
+    return g / g.sum()
+
+def gauss_kern_1d(size):
+    """ Returns a normalized 2D gauss kernel array for convolutions """
+    module_logger.debug("called gauss_kern with size = %i" % size)
+    size = int(size)
+    
+    x = np.arange(-size, size+1, 1)
+    g = np.exp(-(x**2/float(size)))
     return g / g.sum()
 
 
@@ -362,7 +380,7 @@ class MultiMap:
         """
         self.data = np.sort( self.data, order = column )
 
-    def retrieve_2d_plot_data(self, _colx, _coly, errx = None, erry = None, 
+    def retrieve_2d_plot_data(self, _colx, _coly, errx = None, erry = None, N = 1,
                               restrictions = {}):
         """ TODO has to be rewritten """
         _colx = str(_colx)
@@ -377,7 +395,14 @@ class MultiMap:
                 self.get_column_hard_restriction( errx, **restrictions ) )
         yerrs = ( 0 if erry == None else
                 self.get_column_hard_restriction( erry, **restrictions ) )
+        
+        if N > 1:
+            g = gauss_kern_1d(N)
+            module_logger.debug(g)
+            xvals = ssignal.convolve(xvals, g, 'same')
+            yvals = ssignal.convolve(yvals, g, 'same')
 
+ 
         if errx == None and erry == None:
             return ( xvals, yvals )
         elif errx == None and not erry == None:

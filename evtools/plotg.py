@@ -230,6 +230,10 @@ def plotg(dataFileName, **opts):
                 plot_options["cmap"] = cm.binary
             if val == "jet":
                 plot_options["cmap"] = cm.jet
+            if val == 'blues':
+                plot_options["cmap"] = cm.Blues
+            if val == 'reds':
+                plot_options["cmap"] = cm.Reds
         if opt == "-z":
             zlimits = val.split(":")
             plot_options["vmin"] = float(zlimits[0])
@@ -253,6 +257,7 @@ def plotg(dataFileName, **opts):
         if opt == "--noaspect":
             del plot_options["extent"]
             plot_options["aspect"] = "auto"
+            contour_opts['aspect'] = "auto"
 
     # a second run for options that might need the procession of another option
     # already before they are processed
@@ -278,7 +283,7 @@ def plotg(dataFileName, **opts):
                 **plot_options)
     else:
         plot_options.update(contour_opts)
-        result = plt.contour(x, y, z, **plot_options)
+        result = plt.contour(z, **plot_options)
 
     if modify_xlim:
         xlimits = xlim.split( ":" )
@@ -363,7 +368,8 @@ if __name__ == "__main__":
         opts, args = getopt.getopt(sys.argv[1:], 'c:m:z:bN:glhn', 
                                    ['eps','pdf','png','xlim=','ylim=','title=',
                                        'interpolation=', 'grid', "logarithmic",
-                                       "help", "noaspect",'bilogarithmic='])
+                                       "help", "noaspect",'bilogarithmic=',
+                                       "contour", "levels="])
 
         if ("--help", '') in opts:
             raise getopt.GetoptError("")
