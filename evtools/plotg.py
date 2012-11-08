@@ -27,10 +27,12 @@ fh.setLevel( logging.DEBUG )
 
 ch = logging.StreamHandler()
 ch.setLevel( logging.DEBUG )
+ch.setLevel( logging.WARNING )
 
 module_logger.addHandler( ch )
 
 module_logger.setLevel( logging.DEBUG )
+module_logger.setLevel( logging.WARNING )
 
 
 class BiLogNorm(mcolors.Normalize):
@@ -64,6 +66,7 @@ class BiLogNorm(mcolors.Normalize):
             clip = self.clip
 
         result, is_scalar = self.process_value(value)
+        module_logger.debug(result)
 
         #result = np.ma.masked_less_equal(result, 0, copy=False)
 
@@ -99,20 +102,28 @@ class BiLogNorm(mcolors.Normalize):
             else:
                 mask1 |= resdat > c + cutoff
                 mask2 |= resdat < c - cutoff
+                mask3 |= np.ma.masked_outside(resdat, c-cutoff, c+cutoff).mask
             values1 = np.ma.array(result, mask = mask1)
+            module_logger.debug(values1)
             values2 = np.ma.array(result, mask = mask2)
-            values3 = np.ma.array(result, mask = mask3)
+            module_logger.debug(values2)
+            values3 = np.ma.array(result, mask = mask3, hard_mask = True)
+            module_logger.debug(values3)
 
-            # now do the transformation for the upper branch
             values1 -= c
             values2 *= -1
             values2 += c
+            values3 -= values3
+            module_logger.debug(result)
             np.log10(result, result)
+            module_logger.debug(result)
             #np.log10(values1, values1)
             #np.log10(values2, values2)
             values1 -= np.log10(cutoff)
             values2 -= np.log10(cutoff)
+            module_logger.debug(result)
             values2 *= -1
+            module_logger.debug(result)
 
             # and the transformation for the lower branch
             #module_logger.debug("second masked array after rescaling = %s" % values2[0][::50])
@@ -361,6 +372,8 @@ def usage():
         --interpolation
     -n, --noaspect              aspect ratio of the data is not kept
     -h, --help                  shows this explanation
+        --contour               make a contour plot no color-coded one
+        --levels LEVELS         use the colon-separated LEVELS for the contour plot
     """)
 
 if __name__ == "__main__":
@@ -378,7 +391,8 @@ if __name__ == "__main__":
         else : dataFileName = "scalars.out"
 
         fig = plt.figure(figsize=(20,5))
-        ax = fig.add_subplot(111, frame_on = False)
+        #ax = fig.add_subplot(111, frame_on = False)
+        ax = fig.add_subplot(111)
 
         opts = dict(opts)
         plotg(dataFileName, **opts)
