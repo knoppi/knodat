@@ -12,62 +12,99 @@ import knodat.multimap as kmm
 module_logger = logging.getLogger( "evaluation.averaging" )
 # constants of a transmission curve (like number of channels) can be 
 # stored here
+###############################################################################
 constants = {}
 
 # assuming simple 1/L-diffusive behaviour
-fit_diffT = lambda p, x: constants['_c1'] / (1.0 + x/p[0] )
-err_diffT = lambda p, x, y: fit_diffT(p, x) - y
+###############################################################################
+diffT = lambda p, x: constants['c1'] / (1.0 + x/p[0] )
 diffusion_parameters = [1000]
 
-# standard function for fitting spin transport is exponentially damped cosine
-# with the damping as parameter 0 and the frequency as parameter 1
-# we need limits for the validity of the function they are set to some thing
-constants['limit_exp_spin_lower'] = 10
-constants['limit_exp_spin_upper'] = 20000
-fit_spinT = lambda x, p: p[1] * np.exp(-x/p[0])
-err_spinT = lambda p, x, y: fit_spinT(p, x) - y
-err_spinT = lambda p, x, y: np.piecewise( x, 
-    [ x < constants['limit_exp_spin_lower'], x > constants['limit_exp_spin_upper'] ],
-    [ y, y, fit_spinT ], p ) - y
-spinTransport_default_parameters = [1000, 1.0]
+# if we assume a localized transport regime an exponential decay
+# describes the length dependence
+###############################################################################
+expT = lambda p, x: p[0] * exp(2 * x / p[1])
+localization_parameters = [10,10000]
 
-expDecay = lambda l_decay, x: constants['_c1'] + exp( -x / l_decay )
-expDecay_dev = lambda p, x, y: y - expDecay( p[0], x )
-expDecay_params = [100]
+# For the spin transport we also asume an exponential decay
+###############################################################################
+spinT = lambda p, x: p[0] * exp( - x / p[1])
+spinT_parameters = [0.5, 1000]
 
-def calculateSpinTransmission( dataFileName, 
-        columns = ['_L', '_T', '_Tuu', '_Tdu', '_Tud', '_Tdd', '_c1' ],
-        colsToAverage = ["_T", '_Tspin', '_Tspin2'],
-        colsToFit = ["_T","_Tspin"],
-        xCol = "_L",
-        shapeTransmission = [err_diffT, err_spinT], 
-        shapeParameters = [diffusion_parameters, spinTransport_default_parameters],
-        generalInformation = ['_c1']):
-    module_logger.debug( "calculateSpin function" )
-    # filename for evaluated output
-    outfileName = dataFileName.replace(".out",".dat")
-    T = MultiMap()
+# specialized function to do all the fancy averaging stuff with the particular
+# goal to get insight into spin transport of a given system
+###############################################################################
+def calculate_spin_transmission(dataFileName, 
+        columns = ['L', 'T', 'Tuu', 'Tdu', 'Tud', 'Tdd', 'c1' ],
+        colsToAverage = ["T", 'polarization', 'relaxationrate', "Ttemp"],
+        colsToFit = ["T","Tlog","polarization"],
+        xCol = "L",
+        shapeTransmission = [diffT, expT, spinT], 
+        shapeParameters = [diffusion_parameters, localization_parameters, 
+            spinT_parameters],
+        generalInformation = ['c1']):
+    module_logger.debug("calculating charge and "
+            "spin transmission from the input file %s" % dataFileName)
+    
+    # the input data
+    ###########################################################################
+    T = kmm.MultiMap()
     T.set_column_names( *columns )
     T.read_file( dataFileName )
 
+    # add new columns for spin transmission, spin relaxation and
+    # potentially localized charge transport
+    ###########################################################################
     spinTransmission = lambda uu,du,t : ( uu - du ) / t
-    neededColumns = ['_Tuu', '_Tdu', '_T']
-    newName = "_Tspin"
+    neededColumns = ['Tuu', 'Tdu', 'T']
+    newName = "polarization"
     T.add_column( newName, origin = neededColumns,
             connection = spinTransmission )
 
-    spinTransmission = lambda uu,du : du / uu
-    neededColumns = ['_Tuu', '_Tdu']
-    newName = "_Tspin2"
+    relaxationrate = lambda uu,du : du / uu
+    neededColumns = ['Tuu', 'Tdu']
+    newName = "relaxationrate"
     T.add_column( newName, origin = neededColumns,
-            connection = spinTransmission )
+            connection = relaxationrate )
 
-    return calculateFromObject( T, outfileName,
+    # and the logarithm of the transmission
+    T.add_column('Ttemp', origin = ['T'], connection = log)
+
+    # do the averaging
+    ###########################################################################
+    outfileName = dataFileName.replace(".out",".dat")
+    calculateFromObject(T, outfileName,
             colsToAverage = colsToAverage,
-            colsToFit = colsToFit, xCol = xCol,
-            shapeTransmission = shapeTransmission,
-            shapeParameters = shapeParameters,
-            generalInformation = generalInformation )
+            colsToFit = [], xCol = xCol,
+            generalInformation = generalInformation)
+
+    # load the file with the averaged data
+    ###########################################################################
+    O = kmm.MultiMap(outfileName)
+    
+    # add one new row for the localized regime
+    O.add_column('Tlog', origin = ["Ttemp"], connection = exp)
+
+    # do fitting
+    result = []
+    xvals = O.get_possible_values( xCol )
+    
+    for i, column in enumerate(colsToFit):
+        yvals = O.get_column(column)
+        
+        module_logger.debug("xvals.shape: %s" % (xvals.shape,))
+        module_logger.debug("yvals.shape: %s" % (yvals.shape,))
+
+        err = lambda p, x, y: y - shapeTransmission[i](p, x)
+        par = shapeParameters[i]
+        args = (xvals, yvals)
+        
+        output, success = optimize.leastsq(err, par, args = args)
+        result.append(output)
+
+    result.append(constants)
+
+    return result
 
 def calculateFromObject(T, outfileName, colsToAverage = ["_T"], 
                         colsToFit = ["_T"], xCol = "_L", 
@@ -132,7 +169,7 @@ def calculate( dataFileName, cols = ['_L','_T','_c1'],
         colsToAverage = ["_T"],
         colsToFit = ["_T"],
         xCol = "_L",
-        shapeTransmission = [err_diffT], 
+        shapeTransmission = [diffT], 
         shapeParameters = [diffusion_parameters],
         generalInformation = ['_c1']
         ):

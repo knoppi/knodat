@@ -62,13 +62,13 @@ def plotcurr(dataFileName, **opts):
             v_col = float(val)
         if opt == "-m":
             if val == "spin":
-                plot_options["cmap"] = my_cm.spin
+                color_plot_options["cmap"] = my_cm.spin
             if val == "hot":
-                plot_options["cmap"] = cm.hot_r
+                color_plot_options["cmap"] = cm.hot_r
             if val == "grey":
-                plot_options["cmap"] = cm.binary
+                color_plot_options["cmap"] = cm.binary
             if val == "jet":
-                plot_options["cmap"] = cm.jet
+                color_plot_options["cmap"] = cm.jet
         if opt == "-z":
             zlimits = val.split(":")
             color_plot_options["vmin"] = float(zlimits[0])
@@ -175,7 +175,8 @@ if __name__ == "__main__":
         -N=bins                 average over a
         -b
         -s, --scale=FACTOR  changes the arrow size by FACTOR
-        -m=NAME
+        -m=NAME                     the NAME of the desired colormap, possible values are
+                                    spin, hot, gray and jet
         -z
             --eps
             --pdf

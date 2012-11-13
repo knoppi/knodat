@@ -21,13 +21,22 @@ ch = logging.StreamHandler()
 ch.setFormatter(formatter)
 ch.setLevel(logging.WARNING)
 #ch.setLevel(logging.DEBUG)
+ch.setLevel(logging.WARNING)
 
 module_logger.addHandler(ch)
 
-module_logger.setLevel(logging.DEBUG)
+module_logger.setLevel(logging.WARNING)
 
 # define a global zero
 ZERO = 1E-6
+
+def set_debug_level(level):
+    possible_levels = dict(debug = logging.DEBUG, info = logging.INFO,
+            warning = logging.WARNING, error = logging.ERROR,
+            fatal = logging.FATAL)
+    ch.setLevel(possible_levels[level])
+    module_logger.setLevel(possible_levels[level])
+
 
 def gauss_kern(size, sizey=None):
     """ Returns a normalized 2D gauss kernel array for convolutions """
@@ -41,6 +50,15 @@ def gauss_kern(size, sizey=None):
     g = np.exp(-(x**2/float(size)+y**2/float(sizey)))
     return g / g.sum()
 
+def gauss_kern_1d(size):
+    """ Returns a normalized 2D gauss kernel array for convolutions """
+    module_logger.debug("called gauss_kern with size = %i" % size)
+    size = int(size)
+    
+    x = np.arange(-size, size+1, 1)
+    g = np.exp(-(x**2/float(size)))
+    return g / g.sum()
+
 
 class MultiMap:
     def __init__(self, _fileName=None, _cols=None):
@@ -51,7 +69,10 @@ class MultiMap:
         if not _cols == None:
             self.set_column_names(*_cols)
         if _fileName is not None:
-            self.read_file( _fileName )
+            if _fileName[-4:] == '.npy':
+                self.read_file_numpy_style(_fileName)
+            else:
+                self.read_file( _fileName )
 
         module_logger.debug("MultiMap initialization:")
         module_logger.debug("filename: %s" % _fileName)
@@ -67,6 +88,9 @@ class MultiMap:
         for j in range(len(self.columns)):
             tmp[self.columns[j]] = self.data[i,j]
         return tmp
+
+    def __iter__(self):
+        return iter(self.data)
 
     def getitem( self, i ):
         """ retrieve a single row of the MultiMap as a dict """
@@ -132,6 +156,7 @@ class MultiMap:
             file_id = open(filename,'rb')
             first_row = file_id.readline()
             if first_row[0:2] == "##":
+                module_logger.debug('taking column names from first line')
                 column_names = first_row[3:(len(first_row) - 1)].split(" ")
                 self.set_column_names(*column_names)
             else:
@@ -355,7 +380,7 @@ class MultiMap:
         """
         self.data = np.sort( self.data, order = column )
 
-    def retrieve_2d_plot_data(self, _colx, _coly, errx = None, erry = None, 
+    def retrieve_2d_plot_data(self, _colx, _coly, errx = None, erry = None, N = 1,
                               restrictions = {}):
         """ TODO has to be rewritten """
         _colx = str(_colx)
@@ -370,7 +395,14 @@ class MultiMap:
                 self.get_column_hard_restriction( errx, **restrictions ) )
         yerrs = ( 0 if erry == None else
                 self.get_column_hard_restriction( erry, **restrictions ) )
+        
+        if N > 1:
+            g = gauss_kern_1d(N)
+            module_logger.debug(g)
+            xvals = ssignal.convolve(xvals, g, 'same')
+            yvals = ssignal.convolve(yvals, g, 'same')
 
+ 
         if errx == None and erry == None:
             return ( xvals, yvals )
         elif errx == None and not erry == None:
@@ -420,12 +452,16 @@ class MultiMap:
                     yerr = yerrs, label = label, fmt = fmt )
         return line
 
-    def retrieve_3d_plot_data(self, _x, _y, _z, N = 2, **kwargs):
+    def retrieve_3d_plot_data(self, _x, _y, _z, N = 2, *args, **kwargs):
         """ returns the needed matrices for creating a matplotlib-like 3d-plot
         """
         restrictions = {}
         if 'restrictions' in kwargs.keys():
             restrictions = kwargs["restrictions"]
+
+        grid = 'square'
+        if 'grid' in kwargs.keys():
+            grid = kwargs['grid']
 
         deletion = False;
 
@@ -438,12 +474,18 @@ class MultiMap:
         # for graphene we have to reduce the x-dimension by a factor of 2
         # TODO: this could be solved in a better way automatically, 
         # but at the moment only graphene is interesting for me
-        T,Y = np.meshgrid(x[::2], y)
-        X = np.zeros(T.shape)
-        X[0::4] = T[0::4]
-        X[1::4] = T[1::4] + 0.5
-        X[2::4] = T[2::4] + 0.5
-        X[3::4] = T[3::4] + 0.5
+        X = np.zeros((1,1))
+        Y = np.zeros((1,1))
+        if grid == 'graphenegrid':
+            module_logger.debug('assuming graphene grid')
+            T,Y = np.meshgrid(x[::2], y)
+            X[0::4] = T[0::4]
+            X[1::4] = T[1::4] + 0.5
+            X[2::4] = T[2::4] + 0.5
+            X[3::4] = T[3::4] + 0.5
+        else:
+            module_logger.debug('assuming square grid')
+            X,Y = np.meshgrid(x, y)
 
         extent = ( x.min(), x.max(), y.min(), y.max() )
 
@@ -458,7 +500,11 @@ class MultiMap:
             Z = data[:][_z].reshape(Y.shape)
         else:
             for row in data:
-                xi = int(np.where(x == row[_x])[0][0] / 2)
+                xi = 0
+                if grid == 'graphenegrid':
+                    xi = int(np.where(x == row[_x])[0][0] / 2)
+                else:
+                    xi = int(np.where(x == row[_x])[0][0])
                 yi, = np.where(y == row[_y])[0]
 
                 X[yi,xi] = row[_x]
@@ -467,15 +513,18 @@ class MultiMap:
 
                 xi += 1
                 
-        g = gauss_kern(N)
-        xoffset = (Y.shape[1] % N) / 2
-        yoffset = (Y.shape[0] % N) / 2
-        module_logger.debug(g)
-        Z = ssignal.convolve(Z, g, 'same')
+        xoffset = 0
+        yoffset = 0
+        if N > 1:
+            g = gauss_kern(N)
+            xoffset = (Y.shape[1] % N) / 2
+            yoffset = (Y.shape[0] % N) / 2
+            module_logger.debug(g)
+            Z = ssignal.convolve(Z, g, 'same')
 
-        X = X[yoffset::N,xoffset::N]
-        Y = Y[yoffset::N,xoffset::N]
-        Z = Z[yoffset::N,xoffset::N]
+            X = X[yoffset::N,xoffset::N]
+            Y = Y[yoffset::N,xoffset::N]
+            Z = Z[yoffset::N,xoffset::N]
         
         return (X, Y, Z, extent )
 
