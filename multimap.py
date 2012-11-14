@@ -479,6 +479,7 @@ class MultiMap:
         if grid == 'graphenegrid':
             module_logger.debug('assuming graphene grid')
             T,Y = np.meshgrid(x[::2], y)
+            X = np.zeros(T.shape)
             X[0::4] = T[0::4]
             X[1::4] = T[1::4] + 0.5
             X[2::4] = T[2::4] + 0.5
