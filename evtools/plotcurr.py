@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.ticker as mticker
 import os
@@ -8,6 +9,7 @@ import getopt
 import textwrap
 
 from knodat.multimap import *
+import knodat.multimap as kmm
 import knodat.colors as my_cm
 
 def plotcurr(dataFileName, **opts):
@@ -19,28 +21,29 @@ def plotcurr(dataFileName, **opts):
     save_png = False
     show_colorbar = False
 
-    u_col = 2
-    v_col = 3
+    u_col = "3"
+    v_col = "4"
 
     color_coding = False
-    c_col = 4
+    c_col = 5
     
     N = 5
 
     plot_options = {}
 
     quiver_plot_options = {}
-    quiver_plot_options["units"] = "height"
+    #quiver_plot_options["units"] = "height"
     quiver_plot_options["width"] = 0.002
     #quiver_plot_options["headlength"] = 3
     #quiver_plot_options["headaxislength"] = 2.5
-    quiver_plot_options["scale"] = 1
+    quiver_plot_options["scale"] = None
     #quiver_plot_options["headwidth"] = 3
     quiver_plot_options["pivot"] = "middle"
 
     color_plot_options = {}
     color_plot_options["cmap"] = my_cm.spin
 
+    opts = dict(opts)
     for opt,val in opts.items():
         if opt == "--pdf": save_pdf = True
         if opt == "--eps": save_eps = True
@@ -58,8 +61,8 @@ def plotcurr(dataFileName, **opts):
         if opt == "--title":
             plt.title(val)
         if opt == "-c":
-            u_col = float(val) - 1
-            v_col = float(val)
+            u_col = val
+            v_col = str(int(val) + 1)
         if opt == "-m":
             if val == "spin":
                 color_plot_options["cmap"] = my_cm.spin
@@ -83,17 +86,17 @@ def plotcurr(dataFileName, **opts):
         if opt == "-s" or opt == "--scale":
             quiver_plot_options["scale"] = 1 / float(val)
 
-    data = MultiMap(dataFileName)
+    data = kmm.MultiMap(dataFileName)
 
     # this is getting the data for the quiverplot
-    x,y,u,v,extent = data.retrieve_quiver_plot_data("1", "2", u_col, v_col, N = N)
+    x,y,u,v,extent = data.retrieve_quiver_plot_data("1", "2", u_col, v_col, N = N, grid = "graphenegrid")
     print "xrange: ", np.min(x), np.max(x)
     print "yrange: ", np.min(y), np.max(y)
     print "urange: ", np.min(u), np.max(u)
     print "vrange: ", np.min(v), np.max(v)
 
     if color_coding:
-        x,y,c,extent = data.retrieve_3d_plot_data("1", "2", c_col, N = N)
+        x,y,c,extent = data.retrieve_3d_plot_data("1", "2", c_col, N = N, grid = "graphenegrid")
         print "crange: ", np.min(c), np.max(c)
         options = dict(plot_options, **color_plot_options)
         plt.imshow(c, extent = extent, **options)
@@ -143,25 +146,27 @@ if __name__ == "__main__":
         opts, args = getopt.getopt(sys.argv[1:], 'c:m:z:bN:s:f:', 
                                ['col=','eps','pdf','png','xlim=',
                                    'ylim=','title=', 'color=',
-                                   'scale=','figsize='])
+                                   'scale=','figsize=','debug'])
 
         figsize = (20, 5)
+        opts = dict(opts)
         for opt,val in opts.items():
             if opt == "-f" or opt == "--figsize":
                 tmp = val.splot(",")
                 figsize = tuple([float(x) for x in tmp])
+            if opt == '--debug':
+                kmm.set_debug_level("debug")
 
         fig = plt.figure(figsize=figsize)
         ax = fig.add_subplot(111, frame_on = False)
 
-        opts = dict(opts)
         
         if len(args) > 0 : dataFileName = args[0]
         else : dataFileName = "scalars.out"
        
         plotcurr(dataFileName, **opts)
 
-        plt.axis("equal")
+        #plt.axis("equal")
         plt.show()
     except getopt.GetoptError:
         print textwrap.dedent("""\

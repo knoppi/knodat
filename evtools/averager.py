@@ -9,7 +9,30 @@ from scipy.stats import sem
 
 import knodat.multimap as kmm
 
-module_logger = logging.getLogger( "evaluation.averaging" )
+# I set the logging to both logging to std out and to a file with
+# two different logging levels.
+module_logger = logging.getLogger("averager")
+formatter = logging.Formatter(
+    fmt = "%(relativeCreated)d -- %(name)s -- %(levelname)s -- %(message)s" )
+
+ch = logging.StreamHandler()
+ch.setFormatter(formatter)
+ch.setLevel(logging.WARNING)
+
+module_logger.addHandler(ch)
+module_logger.setLevel(logging.WARNING)
+
+# define a global zero
+ZERO = 1E-6
+
+def set_debug_level(level):
+    possible_levels = dict(debug = logging.DEBUG, info = logging.INFO,
+            warning = logging.WARNING, error = logging.ERROR,
+            fatal = logging.FATAL)
+    ch.setLevel(possible_levels[level])
+    module_logger.setLevel(possible_levels[level])
+
+
 # constants of a transmission curve (like number of channels) can be 
 # stored here
 ###############################################################################
@@ -43,8 +66,7 @@ def calculate_spin_transmission(dataFileName,
         shapeParameters = [diffusion_parameters, localization_parameters, 
             spinT_parameters],
         generalInformation = ['c1']):
-    module_logger.debug("calculating charge and "
-            "spin transmission from the input file %s" % dataFileName)
+    module_logger.info("averaging data in file %s" % dataFileName)
     
     # the input data
     ###########################################################################
@@ -132,21 +154,26 @@ def calculateFromObject(T, outfileName, colsToAverage = ["_T"],
     for value in generalInformation:
         constants[value] = T.get_possible_values( value )[0]
 
+    N = 0
     for x0 in xvals:
         current_restrictions={ xCol : x0 }
 
         outputline = [ x0 ]
         for y in colsToAverage:
             yvals = T.get_column_hard_restriction(y, **current_restrictions)
+            N = yvals.shape[0]
             yaverage = np.average(yvals)
-            #yerror   = np.std( yvals )
-            yerror   = sem(yvals)
+            #yerror   = sem(yvals)
+            yerror = np.mean(yvals) / np.sqrt(N)
             rms = np.sqrt(np.mean((yvals - yaverage)**2))
             outputline.extend([yaverage, yerror, rms])
+
 
         O.append_row( outputline )
         #O.appendRow( np.array( tuple( outputline ), ndmin=2 ) )
 
+    module_logger.info("ensemble size: %i" % N)
+    
     # write averaged data
     O.write_file( outfileName )
 

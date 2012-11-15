@@ -12,19 +12,11 @@ module_logger = logging.getLogger("multimap")
 formatter = logging.Formatter(
     fmt = "%(relativeCreated)d -- %(name)s -- %(levelname)s -- %(message)s" )
 
-#fh = logging.FileHandler('multimap.log')
-#fh.setFormatter(formatter)
-#fh.setLevel(logging.DEBUG)
-#module_logger.addHandler(fh)
-
 ch = logging.StreamHandler()
 ch.setFormatter(formatter)
 ch.setLevel(logging.WARNING)
-#ch.setLevel(logging.DEBUG)
-ch.setLevel(logging.WARNING)
 
 module_logger.addHandler(ch)
-
 module_logger.setLevel(logging.WARNING)
 
 # define a global zero
@@ -63,6 +55,8 @@ def gauss_kern_1d(size):
 class MultiMap:
     def __init__(self, _fileName=None, _cols=None):
         """initialization of the Multimap"""
+        module_logger.info("MultiMap initialization:")
+        module_logger.info("... filename: %s" % _fileName)
         self.commentIndicators = ['#']
         self.columns = []
         self.dataType = []
@@ -74,13 +68,10 @@ class MultiMap:
             else:
                 self.read_file( _fileName )
 
-        module_logger.debug("MultiMap initialization:")
-        module_logger.debug("filename: %s" % _fileName)
-        module_logger.debug("columns: %s" % (self.columns, ))
-        module_logger.debug("data type: %s" % self.dataType)
+        module_logger.debug("-- MultiMap initialized")
 
     def __del__(self):
-        module_logger.info("multimap deleted")
+        module_logger.debug("multimap deleted")
 
     def __getitem__( self, i ):
         """ retrieve a single row of the MultiMap as a dict """
@@ -114,7 +105,7 @@ class MultiMap:
         for i in keyw:
             new_data_type.append((i, standardType))
 
-        module_logger.debug(new_data_type)
+        module_logger.debug("... data type: %s" % new_data_type)
 
         self.set_data_type(new_data_type)
 
@@ -160,13 +151,11 @@ class MultiMap:
                 column_names = first_row[3:(len(first_row) - 1)].split(" ")
                 self.set_column_names(*column_names)
             else:
+                module_logger.debug("column names not given on first line")
                 while first_row[0:1] in self.commentIndicators:
                     first_row = file_id.readline()
                 number_of_cols = len(first_row.strip().split(" "))
-                module_logger.debug(
-                        "content of first row: %s" %
-                        first_row)
-                module_logger.info("number of columns: %i" % number_of_cols)
+                module_logger.debug("... number of columns: %i" % number_of_cols)
                 column_names = [str(x) for x in range(1, number_of_cols + 1)]
                 self.set_column_names(*column_names)
 
@@ -282,10 +271,10 @@ class MultiMap:
         """
         return self.get_column_general( desire )
 
-    def get_subset(self, restrictions = {}, _deletion = False):
+    def get_subset(self, restrictions = {}, deletion = False):
         """ returns a subset of data with hard restrictions
         """
-        module_logger.info(restrictions)
+        module_logger.debug('get_subset: restrictions: %s' % (restrictions,))
         restriction_lhs = []
         restriction_rhs = []
         for key in restrictions:
@@ -304,8 +293,9 @@ class MultiMap:
             indices = indices[ np.where( _lambda( i, result[:][rest_name] ) ) ]
             i += 1
 
-        if _deletion: 
-                self.data = np.delete(self.data, indices, 0)
+        if deletion: 
+            module_logger.debug("deletion!")
+            self.data = np.delete(self.data, indices, 0)
         return result[:]
 
     def add_column(self, name, dataType = "|f8", 
@@ -464,26 +454,31 @@ class MultiMap:
             grid = kwargs['grid']
 
         deletion = False;
+        if "deletion" in kwargs.keys():
+            deletion = kwargs['deletion']
 
-        data = self.get_subset(restrictions = restrictions)
+        data = self.get_subset(restrictions = restrictions, deletion = deletion)
         data = np.sort(data, order=[_y, _x])
 
         x = np.unique(data[:][_x])
         y = np.unique(data[::-1][_y])
 
         # for graphene we have to reduce the x-dimension by a factor of 2
-        # TODO: this could be solved in a better way automatically, 
-        # but at the moment only graphene is interesting for me
         X = np.zeros((1,1))
         Y = np.zeros((1,1))
         if grid == 'graphenegrid':
             module_logger.debug('assuming graphene grid')
+            x0 = x[0]
+            x1 = x[0] - x0
+            x2 = x[1] - x0
+            x3 = x[2] - x0
+            x4 = x[3] - x0
             T,Y = np.meshgrid(x[::2], y)
             X = np.zeros(T.shape)
-            X[0::4] = T[0::4]
-            X[1::4] = T[1::4] + 0.5
-            X[2::4] = T[2::4] + 0.5
-            X[3::4] = T[3::4] + 0.5
+            X[0::4] = T[0::4] + x1
+            X[1::4] = T[1::4] + x2
+            X[2::4] = T[2::4] + x3
+            X[3::4] = T[3::4] + x4
         else:
             module_logger.debug('assuming square grid')
             X,Y = np.meshgrid(x, y)
@@ -497,22 +492,31 @@ class MultiMap:
         ##Y = np.zeros(Z.shape)
         # NOTE missing values rot this reshaping, an additional method for that
         # case is the one commented out below, but this is by far less fast
-        if len(data[:][_z]) == X.shape[0]*X.shape[1]:
-            Z = data[:][_z].reshape(Y.shape)
-        else:
-            for row in data:
-                xi = 0
-                if grid == 'graphenegrid':
-                    xi = int(np.where(x == row[_x])[0][0] / 2)
-                else:
-                    xi = int(np.where(x == row[_x])[0][0])
-                yi, = np.where(y == row[_y])[0]
+        difference = X.shape[0]*X.shape[1] - len(data[:][_z])
+        module_logger.debug('datapoints %i' % len(data[:][_z]))
+        module_logger.debug('grid size %i' % (X.shape[0]*X.shape[1]))
+        module_logger.debug('difference to optimum entry number %i' % difference)
+        data = np.sort(data, order=[_x, _y])
+        data  = np.append(data[:], data[-difference:])
+        data = np.sort(data, order=[_y, _x])
+        
+        Z = data[:][_z].reshape(Y.shape)
+        #if len(data[:][_z]) == X.shape[0]*X.shape[1]:
+            #Z = data[:][_z].reshape(Y.shape)
+        #else:
+            #for row in data:
+                #xi = 0
+                #if grid == 'graphenegrid':
+                    #xi = int(np.where(x == row[_x])[0][0] / 2)
+                #else:
+                    #xi = int(np.where(x == row[_x])[0][0])
+                #yi, = np.where(y == row[_y])[0]
+#
+                #X[yi,xi] = row[_x]
+                #Y[yi,xi] = row[_y]
+                #Z[yi,xi] = row[_z]
 
-                X[yi,xi] = row[_x]
-                Y[yi,xi] = row[_y]
-                Z[yi,xi] = row[_z]
-
-                xi += 1
+                #xi += 1
                 
         xoffset = 0
         yoffset = 0
@@ -520,7 +524,6 @@ class MultiMap:
             g = gauss_kern(N)
             xoffset = (Y.shape[1] % N) / 2
             yoffset = (Y.shape[0] % N) / 2
-            module_logger.debug(g)
             Z = ssignal.convolve(Z, g, 'same')
 
             X = X[yoffset::N,xoffset::N]
@@ -534,49 +537,88 @@ class MultiMap:
             matplotlib documentation; this method basically returns the data
             in a format as the matplotlib.pyplot.quiver method understand
         """
+        module_logger.debug("retrieve_quiver_plot_data, x-col: %s" % (_x))
+        module_logger.debug("retrieve_quiver_plot_data, y-col: %s" % (_y))
+        module_logger.debug("retrieve_quiver_plot_data, u-col: %s" % (_u))
+        module_logger.debug("retrieve_quiver_plot_data, v-col: %s" % (_v))
+
         restrictions = {}
         if 'restrictions' in kwargs.keys():
+            module_logger.debug("retrieve_quiver_plot_data restrictions: %s" % (kwargs["restrictions"]))
             restrictions = kwargs["restrictions"]
 
-        deletion = False;
+        grid = 'square'
+        if 'grid' in kwargs.keys():
+            grid = kwargs['grid']
 
-        data = self.get_subset(restrictions = restrictions)
+        deletion = False;
+        if "deletion" in kwargs.keys():
+            deletion = kwargs['deletion']
+
+        data = self.get_subset(restrictions = restrictions, deletion = deletion)
         data = np.sort(data, order=[_y, _x])
 
-        x = np.unique(data[:][_x])
+        x = np.unique(data[::][_x])
         y = np.unique(data[::-1][_y])
+        u = (data[::][_u])
+
+        module_logger.debug("retrieve_quiver_plot_data, x-values: %s" % x)
+        module_logger.debug("retrieve_quiver_plot_data, y-values: %s" % y)
+        module_logger.debug('datapoints %s' % (u))
 
         # for graphene we have to reduce the x-dimension by a factor of 2
-        # TODO: this could be solved in a better way automatically, 
-        # but at the moment only graphene is interesting for me
-        T,Y = np.meshgrid(x[::2], y)
-        X = np.zeros(T.shape)
-        X[0::4] = T[0::4]
-        X[1::4] = T[1::4] + 0.5
-        X[2::4] = T[2::4] + 0.5
-        X[3::4] = T[3::4] + 0.5
+        X = np.zeros((1,1))
+        Y = np.zeros((1,1))
+        if grid == 'graphenegrid':
+            module_logger.debug('assuming graphene grid')
+            x0 = x[0]
+            x1 = x[0] - x0
+            x2 = x[1] - x0
+            x3 = x[2] - x0
+            x4 = x[3] - x0
+            T,Y = np.meshgrid(x[::2], y)
+            X = np.zeros(T.shape)
+            X[0::4] = T[0::4] + x1
+            X[1::4] = T[1::4] + x2
+            X[2::4] = T[2::4] + x3
+            X[3::4] = T[3::4] + x4
+        else:
+            module_logger.debug('assuming square grid')
+            X,Y = np.meshgrid(x, y)
 
         extent = ( x.min(), x.max(), y.min(), y.max() )
 
-        U = np.zeros(X.shape)
-        V = np.zeros(X.shape)
+        #U = np.zeros(X.shape)
+        #V = np.zeros(X.shape)
         
         # NOTE missing values rot this reshaping, an additional method for that
         # case is the one commented out below, but this is by far less fast
-        if len(data[:][_u]) == X.shape[0]*X.shape[1]:
-            U = data[:][_u].reshape(Y.shape)
-            V = data[:][_v].reshape(Y.shape)
-        else:
-            for row in data:
-                xi = int(np.where(x == row[_x])[0][0] / 2)
-                yi, = np.where(y == row[_y])[0]
+        difference = X.shape[0]*X.shape[1] - len(data[:][_u])
+        module_logger.debug('datapoints %s' % (data[:][_u]))
+        module_logger.debug('grid size %i' % (X.shape[0]*X.shape[1]))
+        module_logger.debug('difference to optimum entry number %i' % difference)
+        data = np.sort(data, order=[_x, _y])
+        data = np.append(data[:], data[-difference:])
+        data = np.sort(data, order=[_y, _x])
+        
+        U = data[:][_u].reshape(Y.shape)
+        V = data[:][_v].reshape(Y.shape)
+        #if len(data[:][_u]) == X.shape[0]*X.shape[1]:
+            #module_logger.debug("retrieve_quiver_plot_data: using fast reshaping method for the data")
+            #U = data[:][_u].reshape(Y.shape)
+            #V = data[:][_v].reshape(Y.shape)
+        #else:
+            #module_logger.debug("retrieve_quiver_plot_data: using slow element-wise ordering")
+            #for row in data:
+                #xi = int(np.where(x == row[_x])[0][0] / 2)
+                #yi, = np.where(y == row[_y])[0]
 
-                X[yi,xi] = row[_x]
-                Y[yi,xi] = row[_y]
-                U[yi,xi] = row[_u]
-                V[yi,xi] = row[_v]
+                #X[yi,xi] = row[_x]
+                #Y[yi,xi] = row[_y]
+                #U[yi,xi] = row[_u]
+                #V[yi,xi] = row[_v]
 
-                xi += 1
+                #xi += 1
                 
         g = gauss_kern(N, N)
         xoffset = (Y.shape[1] % N) / 2
@@ -591,11 +633,6 @@ class MultiMap:
         V = V[yoffset::N,xoffset::N]
 
         return (X, Y, U, V, extent)
-
-    def retrieveQuiverPlotData( self, _x, _y, _u, _v, **kwargs ):
-        """ returns the needed matrices for creating a matplotlib-like 3d-plot 
-        """
-        return self.retrieve_quiver_plot_data(_x, _y, _u, _v, **kwargs)
 
     # Old functions kept due to backwards comapbility; will give a warning
     # about deprecation
@@ -669,6 +706,11 @@ class MultiMap:
         '''Deprecated; use retrieve_3d_plot_data instead'''
         module_logger.warning("using deprecated function retrieve3dPlotData!")
         return self.retrieve_3d_plot_data(_x, _y, _z, **kwargs)
+
+    def retrieveQuiverPlotData( self, _x, _y, _u, _v, **kwargs ):
+        """ returns the needed matrices for creating a matplotlib-like 3d-plot 
+        """
+        return self.retrieve_quiver_plot_data(_x, _y, _u, _v, **kwargs)
 
     def getColumnGeneral(self, _col_name, _col2_names = [], 
                          _lambda = None, _deletion = False):

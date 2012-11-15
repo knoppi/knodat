@@ -19,17 +19,10 @@ module_logger = logging.getLogger("PLOTG")
 formatter = logging.Formatter(
         fmt = "%(relativeCreated)d -- %(name)s -- %(levelname)s -- %(message)s" )
 
-fh = logging.FileHandler( 'eval.log' )
-fh.setFormatter( formatter )
-fh.setLevel( logging.DEBUG )
-
-#logger.addHandler( fh )
-
 ch = logging.StreamHandler()
 ch.setLevel( logging.WARNING )
 
 module_logger.addHandler( ch )
-
 module_logger.setLevel( logging.WARNING )
 
 def set_debug_level(level):
@@ -185,7 +178,7 @@ def plotg(dataFileName, **opts):
 
     # the default column, note that col-numbering is
     # 0 1 2 ...
-    z_col = 2
+    z_col = "3"
 
     # the dict with the plotting options
     plot_options = {}
@@ -310,9 +303,22 @@ def plotg(dataFileName, **opts):
         plt.ylim( float( ylimits[0] ), float( ylimits[1] ) )
 
     ax = plt.gca()
-    module_logger.debug(ax.get_position())
+    fig = plt.gcf()
     
     if show_colorbar is True:
+        trans = axes.transAxes
+        inv = fig.transFigure.inverted()
+        
+        rect = np.array([0.75, -0.1, 0.15, 0.08])
+        rect[2:4] += rect[0:2]
+        
+        rect[0:2] = trans.transform(rect[0:2])
+        rect[2:4] = trans.transform(rect[2:4])
+        rect[0:2] = inv.transform(rect[0:2])
+        rect[2:4] = inv.transform(rect[2:4])
+
+        rect[2:4] -= rect[0:2]
+        
         cax = plt.axes([0.7,0.1,0.28,0.08], transform = ax.transAxes)
         plt.colorbar(cax=cax, orientation = "horizontal")
         labels = cax.get_xticklabels()
@@ -320,9 +326,6 @@ def plotg(dataFileName, **opts):
                 label.set_rotation(30) 
                 label.set_ha("right")
                 label.set_size("small")
-
-    ax.xaxis.set_major_locator(mticker.NullLocator())
-    ax.yaxis.set_major_locator(mticker.NullLocator())
 
     # save to eps
     if save_eps:
@@ -399,6 +402,9 @@ if __name__ == "__main__":
         fig = plt.figure(figsize=(20,5))
         #ax = fig.add_subplot(111, frame_on = False)
         ax = fig.add_subplot(111)
+
+        #ax.xaxis.set_major_locator(mticker.NullLocator())
+        #ax.yaxis.set_major_locator(mticker.NullLocator())
 
         opts = dict(opts)
         plotg(dataFileName, **opts)
