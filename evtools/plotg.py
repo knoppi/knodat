@@ -26,13 +26,18 @@ fh.setLevel( logging.DEBUG )
 #logger.addHandler( fh )
 
 ch = logging.StreamHandler()
-ch.setLevel( logging.DEBUG )
 ch.setLevel( logging.WARNING )
 
 module_logger.addHandler( ch )
 
-module_logger.setLevel( logging.DEBUG )
 module_logger.setLevel( logging.WARNING )
+
+def set_debug_level(level):
+    possible_levels = dict(debug = logging.DEBUG, info = logging.INFO,
+            warning = logging.WARNING, error = logging.ERROR,
+            fatal = logging.FATAL)
+    ch.setLevel(possible_levels[level])
+    module_logger.setLevel(possible_levels[level])
 
 
 class BiLogNorm(mcolors.Normalize):
@@ -305,9 +310,10 @@ def plotg(dataFileName, **opts):
         plt.ylim( float( ylimits[0] ), float( ylimits[1] ) )
 
     ax = plt.gca()
+    module_logger.debug(ax.get_position())
     
     if show_colorbar is True:
-        cax = plt.axes([0.7,0.1,0.18,0.08])
+        cax = plt.axes([0.7,0.1,0.28,0.08], transform = ax.transAxes)
         plt.colorbar(cax=cax, orientation = "horizontal")
         labels = cax.get_xticklabels()
         for label in labels:
