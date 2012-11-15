@@ -205,7 +205,7 @@ def plotg(dataFileName, **opts):
 
     # fetch the data
     data = MultiMap(dataFileName)
-    x,y,z,extent = data.retrieve_3d_plot_data("1", "2", z_col, grid = 'graphene', N = N)
+    x,y,z,extent = data.retrieve_3d_plot_data("1", "2", z_col, grid = 'graphenegrid', N = N)
     plot_options["extent"] = extent
 
     # the following data is useful in every case
@@ -266,7 +266,7 @@ def plotg(dataFileName, **opts):
             show_grid = True
 
         if opt == "--noaspect":
-            del plot_options["extent"]
+            #del plot_options["extent"]
             plot_options["aspect"] = "auto"
             contour_opts['aspect'] = "auto"
 
