@@ -316,10 +316,10 @@ class MultiMap:
             newCol = connection(*arguments)
             newCol = [newCol]
 
-        module_logger.debug("new column: %s" % newCol)
+        module_logger.info("new column: %s" % newCol)
 
         new_shape = (self.data.shape[0], len(self.dataType))
-        module_logger.debug("new shape: %s" % (new_shape, ))
+        module_logger.info("new shape: %s" % (new_shape, ))
 
         # do some strange transformation which should be faster than
         # iterating over the rows
