@@ -63,12 +63,13 @@ class BSParser:
         self.bs.set_column_names( *columns )
         self.bs.read_file( _filename )
 
-    def plot(self, color = None, fmt = "", xscaling = 1.0, markersize = 4.0):
+    def plot(self, color = None, fmt = "", xscaling = 1.0, yscaling = 1.0, 
+            markersize = 4.0):
         kvals = xscaling * self.bs.get_column( '_k' )
 
         line = ""
         for iband,band in self.bands.items():
-            Evals = self.bs.get_column( band )
+            Evals = yscaling * self.bs.get_column(band)
             if color == None: line, = plt.plot(kvals, Evals, fmt)
             else: line, = plt.plot( kvals, Evals, color = color )
             line.set_markersize(markersize)

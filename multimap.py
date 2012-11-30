@@ -248,6 +248,8 @@ class MultiMap:
 
         if _deletion: 
                 self.data = np.delete( self.data, indices, 0 )
+
+        module_logger.info("result internal: %s" % result)
         return result[:][_col_name]
 
     def get_column_hard_restriction(self, desire, **restrictions):
@@ -256,15 +258,11 @@ class MultiMap:
         requesting column "desire" where all the key of "restrictions" 
         exactly have the value given by the values of "restrictions"
         """
-        restriction_lhs = []
-        restriction_rhs = []
-        for key in restrictions:
-            restriction_lhs.append( key )
-            restriction_rhs.append( restrictions[key] )
+        result = self.get_subset(restrictions)
+        module_logger.info("restrictions internal: %s" % restrictions)
+        module_logger.info("result internal: %s" % result)
 
-        restriction_function = lambda n,x: ( x == restriction_rhs[n] )
-        return self.get_column_general( 
-                desire, restriction_lhs, restriction_function )
+        return result[desire]
 
     def get_column( self, desire ):
         """ returns column desire without applying any restriction
@@ -281,7 +279,8 @@ class MultiMap:
             restriction_lhs.append( key )
             restriction_rhs.append( restrictions[key] )
 
-        _lambda = lambda n,x: ( x == restriction_rhs[n] )
+        zero = 1e-2
+        _lambda = lambda n,x: (np.abs(x - restriction_rhs[n]) < zero)
 
         result = self.data[:]
 
@@ -312,7 +311,6 @@ class MultiMap:
             arguments = []
             for colname in origin:
                 arguments.append(self.data[:][colname])
-                module_logger.debug("argument: %s" % self.data[:][colname])
             newCol = connection(*arguments)
             newCol = [newCol]
 
@@ -326,13 +324,9 @@ class MultiMap:
         module_logger.debug("reshaping...")
         self.data = np.array(self.data.tolist())
         self.data = self.data.flatten('F')
-        module_logger.debug("new structure: %s" % self.data)
         self.data = np.append(self.data, newCol)
-        module_logger.debug("with new data: %s" % self.data)
         self.data = self.data.reshape(new_shape, order = "F")
-        module_logger.debug("shaped back: %s" % self.data)
         tmp = [tuple(x) for x in self.data]
-        module_logger.debug("temporary object: %s" % tmp)
         self.data = np.array(tmp, dtype = new_datatype, order = "F")
 
         self.dataType = new_datatype
@@ -369,6 +363,23 @@ class MultiMap:
         """ sorts the MultiMap along column
         """
         self.data = np.sort( self.data, order = column )
+
+    def get_histogram(self, col, restrictions = {}, **kwargs):
+        """get a histogram for the values in column col
+           possible options
+           """
+        kwargs = dict(kwargs)
+        x = self.get_column(col)
+
+        if 'bins' not in kwargs.keys():
+            kwargs['bins'] = 20
+
+        hist, bin_edges = np.histogram(x, **kwargs)
+
+        x = np.zeros(hist.shape)
+        x = 0.5 * (bin_edges[0:-1] + bin_edges[1:])
+
+        return (x, hist)
 
     def retrieve_2d_plot_data(self, _colx, _coly, errx = None, erry = None, N = 1,
                               restrictions = {}):
@@ -537,10 +548,10 @@ class MultiMap:
             matplotlib documentation; this method basically returns the data
             in a format as the matplotlib.pyplot.quiver method understand
         """
-        module_logger.debug("retrieve_quiver_plot_data, x-col: %s" % (_x))
-        module_logger.debug("retrieve_quiver_plot_data, y-col: %s" % (_y))
-        module_logger.debug("retrieve_quiver_plot_data, u-col: %s" % (_u))
-        module_logger.debug("retrieve_quiver_plot_data, v-col: %s" % (_v))
+        module_logger.info("retrieve_quiver_plot_data, x-col: %s" % (_x))
+        module_logger.info("retrieve_quiver_plot_data, y-col: %s" % (_y))
+        module_logger.info("retrieve_quiver_plot_data, u-col: %s" % (_u))
+        module_logger.info("retrieve_quiver_plot_data, v-col: %s" % (_v))
 
         restrictions = {}
         if 'restrictions' in kwargs.keys():

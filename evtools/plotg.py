@@ -306,7 +306,7 @@ def plotg(dataFileName, **opts):
     fig = plt.gcf()
     
     if show_colorbar is True:
-        trans = axes.transAxes
+        trans = ax.transAxes
         inv = fig.transFigure.inverted()
         
         rect = np.array([0.75, -0.1, 0.15, 0.08])
