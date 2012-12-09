@@ -10,7 +10,7 @@ import logging
 # two different logging levels.
 module_logger = logging.getLogger("multimap")
 formatter = logging.Formatter(
-    fmt = "%(relativeCreated)d -- %(name)s -- %(levelname)s -- %(message)s" )
+    fmt = "%(asctime)s -- %(name)s -- %(levelname)s -- %(message)s" )
 
 ch = logging.StreamHandler()
 ch.setFormatter(formatter)
@@ -60,6 +60,7 @@ class MultiMap:
         self.commentIndicators = ['#']
         self.columns = []
         self.dataType = []
+        self.named_indices = False
         if not _cols == None:
             self.set_column_names(*_cols)
         if _fileName is not None:
@@ -73,19 +74,66 @@ class MultiMap:
     def __del__(self):
         module_logger.debug("multimap deleted")
 
-    def __getitem__( self, i ):
+    def __getitem__(self, i):
         """ retrieve a single row of the MultiMap as a dict """
+        module_logger.debug("MultiMap.__getitem__ calling element %s" % i)
         tmp = {}
-        for j in range(len(self.columns)):
-            tmp[self.columns[j]] = self.data[i,j]
+
+        try:
+            module_logger.debug("trying to find the key in the key list")
+            i = self.keys.index(i)
+            module_logger.debug("the key is now %s" % i)
+        except AttributeError as e:
+            module_logger.debug("Exception %s" % e)
+            module_logger.debug("assuming no key list been given")
+        except ValueError as e:
+            module_logger.warning("key %s not in key list" % i)
+        
+        # with the key finally found, we cann create the result
+        try:
+            for j in range(len(self.columns)):
+                tmp[self.columns[j]] = self.data[i][j]
+        except IndexError as e:
+            module_logger.warning("Calling no-existent key!")
+            module_logger.warning(e)
         return tmp
+
+    def __setitem__(self, key, value):
+        # possible error checking:
+        # - key valid (type, index valid)
+        # - value is dict and has correct dType
+        module_logger.debug("__setitem__(%s, %s)" % (key, value))
+        try:
+            module_logger.debug("trying to find the key in the key list")
+            i = self.keys.index(key)
+        except AttributeError as e:
+            module_logger.debug("Exception %s" % e)
+            module_logger.debug("assuming no key list been given")
+        except ValueError as e:
+            module_logger.warning("key %s not in key list" % key)
+
+        for j, j2 in enumerate(self.columns):
+            module_logger.debug("... setting element '%s' (%i) in row %i "
+                    "to %s" % (j2, j, i, value[j2]))
+            self.data[i][j] = value[j2]
+
 
     def __iter__(self):
         return iter(self.data)
 
-    def getitem( self, i ):
+    def getitem(self, i):
         """ retrieve a single row of the MultiMap as a dict """
-        self.__getitem__( i )
+        self.__getitem__(i)
+
+    def select_indexing_column(self, name):
+        """choose one column containing the indices which then can be called by
+           getitem"""
+        self.named_indices = True
+        try:
+            self.keys = self.get_column(name).tolist()
+            self.index_column = name
+        except None:
+            module_logger.fatal("chosen invalid key-column")
 
     def set_column_names(self, *keyw, **options):
         """sets the names of the columns and - if needed - the
@@ -105,22 +153,33 @@ class MultiMap:
         for i in keyw:
             new_data_type.append((i, standardType))
 
-        module_logger.debug("... data type: %s" % new_data_type)
 
         self.set_data_type(new_data_type)
 
     def set_data_type(self, new_dataType):
         """sets the data type of the internal data storage and
         creates a new empty np-array"""
+        module_logger.debug("... data type: %s" % new_dataType)
         self.dataType = new_dataType
         self.data = np.zeros( 
                 (0, len(new_dataType)), 
                 dtype = new_dataType)
 
+        self.columns = [x[0] for x in new_dataType]
+
+
     def append_row(self, row):
         """row is some iterable object which somehow has to fit to dtype"""
+        module_logger.debug("append_row(%s)" % (row,))
         new_row = np.array(tuple(row), dtype=self.dataType)
-        self.data = np.append( self.data, new_row )
+        self.data = np.append(self.data, new_row)
+
+        if self.named_indices:
+            self.select_indexing_column(self.index_column)
+
+        #new_row = self.__getitem__(self.keys[-1])
+        #module_logger.debug("new row as ndarray is %s" % (new_row,))
+        #module_logger.debug("new row as ndarray is %s" % (self.data,))
 
     def read_file(self, filename, **options):
         """reads data from ascii file"""
@@ -249,7 +308,6 @@ class MultiMap:
         if _deletion: 
                 self.data = np.delete( self.data, indices, 0 )
 
-        module_logger.info("result internal: %s" % result)
         return result[:][_col_name]
 
     def get_column_hard_restriction(self, desire, **restrictions):
@@ -259,8 +317,6 @@ class MultiMap:
         exactly have the value given by the values of "restrictions"
         """
         result = self.get_subset(restrictions)
-        module_logger.info("restrictions internal: %s" % restrictions)
-        module_logger.info("result internal: %s" % result)
 
         return result[desire]
 
@@ -280,7 +336,7 @@ class MultiMap:
             restriction_rhs.append( restrictions[key] )
 
         zero = 1e-2
-        _lambda = lambda n,x: (np.abs(x - restriction_rhs[n]) < zero)
+        _lambda = lambda n,x: (x == restriction_rhs[n])
 
         result = self.data[:]
 
@@ -742,7 +798,7 @@ class MultiMap:
 
 
 if __name__ == "__main__":
-    ch.setLevel(logging.DEBUG)
+    set_debug_level("debug")
     module_logger.info("create multimap with column a, b and c")
 
     cols = ["a", "b", "c"]
@@ -765,3 +821,12 @@ if __name__ == "__main__":
     add = lambda x, y: x + y
     test_object.add_column("e", origin = ["a", "b"], connection = add)
     module_logger.info("test object in new state: %s" % test_object.data)
+
+    module_logger.info("row 1 contains: %s" % test_object[0])
+
+    module_logger.info("choose column 'b' for indexing")
+    test_object.select_indexing_column("b")
+    module_logger.info("row with key %s contains: %s" % (5.0, test_object[5.0]))
+    module_logger.info("calling non-existent key %s yields: %s" % (3.0, test_object[3.0]))
+    module_logger.info("calling non-existent key %s yields: %s" % (1.0, test_object[1.0]))
+
