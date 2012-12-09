@@ -156,6 +156,9 @@ class MultiMap:
 
         self.set_data_type(new_data_type)
 
+    def length(self):
+        return self.data.shape[0]
+
     def set_data_type(self, new_dataType):
         """sets the data type of the internal data storage and
         creates a new empty np-array"""
