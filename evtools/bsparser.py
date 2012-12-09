@@ -2,26 +2,31 @@
 # -*- coding: utf-8 -*-
 
 import logging
-logger = logging.getLogger( "BSParser" )
-
-formatter = logging.Formatter(
-            fmt = "%(relativeCreated)d -- %(name)s -- %(levelname)s -- %(message)s" )
-
-fh = logging.FileHandler( 'eval.log' )
-fh.setFormatter( formatter )
-fh.setLevel( logging.DEBUG )
-
-logger.addHandler( fh )
-
-ch = logging.StreamHandler()
-ch.setLevel( logging.DEBUG )
-
-logger.addHandler( ch )
-
-logger.setLevel( logging.DEBUG )
-
 import matplotlib
 import matplotlib.pyplot as plt
+
+import knodat.multimap as kmm
+
+module_logger = logging.getLogger("BSParser")
+module_logger.propagate = False
+
+formatter = logging.Formatter(
+        fmt = "%(asctime)s -- %(name)s -- %(levelname)s -- %(message)s" )
+
+ch = logging.StreamHandler()
+ch.setFormatter(formatter)
+ch.setLevel(logging.WARNING)
+
+module_logger.addHandler(ch)
+module_logger.setLevel(logging.WARNING)
+
+def set_debug_level(level):
+    possible_levels = dict(
+            debug = logging.DEBUG, info = logging.INFO,
+            warning = logging.WARNING, error = logging.ERROR,
+            fatal = logging.FATAL)
+    ch.setLevel(possible_levels[level])
+    module_logger.setLevel(possible_levels[level])
 
 if __name__ == '__main__':
     # for the plots themselves
@@ -31,7 +36,6 @@ if __name__ == '__main__':
     plt.ylabel(r'$E[t]$')
 
 # organizing the data
-import knodat.multimap as kmm
 
 debug = True
 
@@ -52,7 +56,8 @@ class BSParser:
 
     def parse( self, _filename ):
         """parses a given input file and creates the corresponding multimap"""
-        bs_file = open( _filename, 'r' )
+        module_logger.info("parsing file %s" % _filename)
+        bs_file = open(_filename, 'r')
 
         self.number_of_columns = len( bs_file.readline().split(" ") )-1
         columns = [ '_k' ]
@@ -60,8 +65,10 @@ class BSParser:
             columns.append( ('_b%s' % i ) )
             self.bands[i] = ('_b%s' % i )
 
-        self.bs.set_column_names( *columns )
-        self.bs.read_file( _filename )
+        module_logger.info("... counting %i bands" % self.number_of_columns)
+
+        self.bs.set_column_names(*columns)
+        self.bs.read_file(_filename)
 
     def plot(self, color = None, fmt = "", xscaling = 1.0, yscaling = 1.0, 
             markersize = 4.0):
@@ -172,7 +179,7 @@ if __name__ == '__main__':
 
     opts, args = getopt.getopt(sys.argv[1:], '', 
                                ['eps','pdf','png','xlim=','ylim=','title=',
-                                'color=','fmt='])
+                                'color=','fmt=', "debug", "info", "help"])
     if len(args) > 0 : dataFileName = args[0]
     else : dataFileName = "transmission.out"
 
@@ -192,8 +199,14 @@ if __name__ == '__main__':
             modify_ylim = True
             ylim = val
         elif opt == "--title":
-            print "setting title"
-            plt.title( val )
+            logging.info("setting title to %s" % val)
+            plt.title(val)
+        elif opt == "--debug":
+            set_debug_level("debug")
+            module_logger.debug("set to debug level")
+        elif opt == "--info":
+            set_debug_level("info")
+            module_logger.debug("set to info level")
         else:
             option_name = opt
             while option_name[0] == "-":
@@ -206,28 +219,30 @@ if __name__ == '__main__':
     bs.plot(**plotting_options)
 
     if modify_xlim:
-        logger.info( "setting xlimits to %s" % xlim )
+        module_logger.info("setting xlimits to %s" % xlim)
         xlimits = xlim.split( ":" )
         plt.xlim( float( xlimits[0] ), float( xlimits[1] ) )
 
     if modify_ylim:
-        logger.info( "setting ylimits to %s" % ylim )
-        ylimits = ylim.split( ":" )
-        plt.ylim( float( ylimits[0] ), float( ylimits[1] ) )
+        module_logger.info("setting ylimits to %s" % ylim)
+        ylimits = ylim.split(":")
+        plt.ylim(float( ylimits[0]), float(ylimits[1]))
 
     # save to eps
     if save_eps:
+        module_logger.info("saving to pdf")
         outfileName = dataFileName.replace(".dat",".eps")
-        plt.savefig( outfileName )
+        plt.savefig(outfileName)
 
     # save to pdf
     if save_pdf:
-        if debug: print "saving to pdf"
+        module_logger.info("saving to pdf")
         outfileName = dataFileName.replace(".dat",".pdf")
         plt.savefig( outfileName )
 
     # save to png
     if save_png:
+        module_logger.info("saving to png")
         outfileName = dataFileName.replace(".dat",".png")
         plt.savefig( outfileName )
 
