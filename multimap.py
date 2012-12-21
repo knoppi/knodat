@@ -54,12 +54,18 @@ def gauss_kern_1d(size):
 
 class MultiMap:
     def __init__(self, _fileName=None, _cols=None):
-        """initialization of the Multimap"""
+        """
+        Initialization of the Multimap
+        Optional parameters are _fileName and _cols.
+        """
         module_logger.info("MultiMap initialization:")
-        module_logger.info("... filename: %s" % _fileName)
+        module_logger.debug("-- filename: %s" % _fileName)
+        module_logger.debug("-- columns: %s" % _cols)
+
         self.commentIndicators = ['#']
         self.columns = []
         self.dataType = []
+
         if not _cols == None:
             self.set_column_names(*_cols)
         if _fileName is not None:
@@ -70,11 +76,11 @@ class MultiMap:
 
         module_logger.debug("-- MultiMap initialized")
 
-    def __del__(self):
-        module_logger.debug("multimap deleted")
-
-    def __getitem__( self, i ):
-        """ retrieve a single row of the MultiMap as a dict """
+    def __getitem__(self, i):
+        """ 
+        Retrieve a single row of the MultiMap as a dict, i can either be an 
+        integer or a variable type key
+        """
         tmp = {}
         for j in range(len(self.columns)):
             tmp[self.columns[j]] = self.data[i,j]
