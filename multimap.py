@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+# developers notes:
+# - http://packages.python.org/joblib/memory.html might speed up
+
 import numpy as np
 import scipy.signal as ssignal
 import matplotlib.pyplot as plt
@@ -74,6 +77,10 @@ class MultiMap:
             else:
                 self.read_file( _fileName )
 
+        # As long as we do not define a column to be the indexing column
+        # getitem_by_index should be chosen to retrieve a single row
+        self.getitem_method = self.getitem_by_index
+
         module_logger.debug("-- MultiMap initialized")
 
     def __getitem__(self, i):
@@ -81,10 +88,28 @@ class MultiMap:
         Retrieve a single row of the MultiMap as a dict, i can either be an 
         integer or a variable type key
         """
+        return self.getitem_method(i)
+
+    def getitem_by_index(self, i):
+        """
+        This method is intended for internal use only, its purpose is to return
+        row i of the multimap as a dictionary.
+        """
         tmp = {}
         for j in range(len(self.columns)):
             tmp[self.columns[j]] = self.data[i,j]
         return tmp
+
+    def getitem_by_x(self, i):
+        """
+        This method is for internal use only. It returns a single row of the
+        multimap as a dictionary defined by col_x = i
+        """
+        try:
+            j = self.x_column.index(i)
+            return self.getitem_by_index(j)
+        except Exception:
+            raise
 
     def __iter__(self):
         return iter(self.data)
@@ -115,6 +140,20 @@ class MultiMap:
 
         self.set_data_type(new_data_type)
 
+    def set_x_column(self, x_name):
+        """
+        This method declares a certain column of the MultiMap to act
+        as an index column, so __getitem__ takes a value of that column
+        as the index.
+        """
+        self.x_column_name = x_name
+        try:
+            self.x_column = self.get_column(x_name).tolist()
+        except Exception:
+            raise
+        else:
+            self.getitem_method = self.getitem_by_x
+
     def length(self):
         return self.data.shape[0]
 
@@ -130,6 +169,13 @@ class MultiMap:
         """row is some iterable object which somehow has to fit to dtype"""
         new_row = np.array(tuple(row), dtype=self.dataType)
         self.data = np.append( self.data, new_row )
+
+        try:
+            self.set_x_column(self.x_column_name)
+        except AttributeError, e:
+            module_logger.warning(e)
+        except:
+            raise
 
     def read_file(self, filename, **options):
         """reads data from ascii file"""
