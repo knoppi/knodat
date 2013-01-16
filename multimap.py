@@ -13,7 +13,7 @@ import logging
 # two different logging levels.
 module_logger = logging.getLogger("multimap")
 formatter = logging.Formatter(
-    fmt = "%(relativeCreated)d -- %(name)s -- %(levelname)s -- %(message)s" )
+    fmt = "%(asctime)s -- %(name)s -- %(levelname)s -- %(message)s" )
 
 ch = logging.StreamHandler()
 ch.setFormatter(formatter)
@@ -177,6 +177,18 @@ class MultiMap:
         except:
             raise
 
+    def add_to_column(self, col, values):
+        try:
+            self.data[:,col] = self.data.column[:,col] + values.transpose()
+        except:
+            raise
+    
+    def multiply_column(self, col, factor):
+        try:
+            self.data[:,col] = self.data.column[:,col] * factor
+        except:
+            raise
+
     def read_file(self, filename, **options):
         """reads data from ascii file"""
         for (key,val) in options:
@@ -319,10 +331,10 @@ class MultiMap:
 
         return result[desire]
 
-    def get_column( self, desire ):
+    def get_column(self, desire):
         """ returns column desire without applying any restriction
         """
-        return self.get_column_general( desire )
+        return self.data[:][desire]
 
     def get_subset(self, restrictions = {}, deletion = False):
         """ returns a subset of data with hard restrictions
@@ -628,10 +640,6 @@ class MultiMap:
         y = np.unique(data[::-1][_y])
         u = (data[::][_u])
 
-        module_logger.debug("retrieve_quiver_plot_data, x-values: %s" % x)
-        module_logger.debug("retrieve_quiver_plot_data, y-values: %s" % y)
-        module_logger.debug('datapoints %s' % (u))
-
         # for graphene we have to reduce the x-dimension by a factor of 2
         X = np.zeros((1,1))
         Y = np.zeros((1,1))
@@ -660,8 +668,6 @@ class MultiMap:
         # NOTE missing values rot this reshaping, an additional method for that
         # case is the one commented out below, but this is by far less fast
         difference = X.shape[0]*X.shape[1] - len(data[:][_u])
-        module_logger.debug('datapoints %s' % (data[:][_u]))
-        module_logger.debug('grid size %i' % (X.shape[0]*X.shape[1]))
         module_logger.debug('difference to optimum entry number %i' % difference)
         data = np.sort(data, order=[_x, _y])
         data = np.append(data[:], data[-difference:])

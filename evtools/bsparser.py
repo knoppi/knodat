@@ -4,6 +4,7 @@
 import logging
 import matplotlib
 import matplotlib.pyplot as plt
+import textwrap
 
 import knodat.multimap as kmm
 
@@ -27,17 +28,15 @@ def set_debug_level(level):
             fatal = logging.FATAL)
     ch.setLevel(possible_levels[level])
     module_logger.setLevel(possible_levels[level])
+    kmm.set_debug_level(level)
 
 if __name__ == '__main__':
     # for the plots themselves
-
     plt.figure()
     plt.xlabel(r'$k[\frac{1}{a}]$')
     plt.ylabel(r'$E[t]$')
 
 # organizing the data
-
-debug = True
 
 show_figure = True
 save_eps    = False
@@ -174,76 +173,95 @@ class BSParser:
 
         return final_bands, gaps
 
+def usage():
+    print textwrap.dedent("""\
+    Usage: bsparser.py [OPTIONS] ... datafilename
+    creates a plot using the first column of datafile as the x-axis and all
+    the other columns as y-values, as in a bandstructure of periodic
+    quantum structures
+
+    Mandatory arguments to long options are mandatory for short options too.
+        --eps                   saves the plot as an eps file
+        --pdf                   saves the plot as a pdf file
+        --png                   saves the plot as a png file
+        --xlim=LOWER:UPPER
+        --ylim=LOWER:UPPER
+        --title=STRING
+        --color=VALUE           By default all the lines are plotted in
+                                different colors. This option defines one color
+                                for all lines
+        --fmt=VALUE             The VALUE defines the format of the plotted lines,
+                                including color, shape, marker style etc.
+        --debug                 activate debug output
+        --info                  activate info output, notice that this is also
+                                activated by the --debug option, if both are given
+                                the last one given dominates
+        --help                  prints this screen and exits
+    """)
+
+
 if __name__ == '__main__':
     import getopt, sys
 
-    opts, args = getopt.getopt(sys.argv[1:], '', 
-                               ['eps','pdf','png','xlim=','ylim=','title=',
-                                'color=','fmt=', "debug", "info", "help"])
-    if len(args) > 0 : dataFileName = args[0]
-    else : dataFileName = "transmission.out"
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], '', 
+                                   ['eps','pdf','png','xlim=','ylim=','title=',
+                                    'color=','fmt=', "debug", "info", "help"])
+        if len(args) > 0 : dataFileName = args[0]
+        else : dataFileName = "transmission.out"
 
-    logging.debug( "%s" % (opts, ) )
+        if ("--help", '') in opts:
+            raise getopt.GetoptError("")
 
-    plotting_options = {}
+        
+        # if asked for, set debug or info output
+        if ("--info", '') in opts:
+                set_debug_level("info")
+        if ("--debug", '') in opts:
+                set_debug_level("debug")
 
-    for opt,val in opts:
-        logging.debug( "%s: %s" % ( opt, val ) )
-        if opt == "--pdf": save_pdf = True
-        elif opt == "--eps": save_eps = True
-        elif opt == "--png": save_png = True
-        elif opt == "--xlim": 
-            modify_xlim = True
-            xlim = val
-        elif opt == "--ylim": 
-            modify_ylim = True
-            ylim = val
-        elif opt == "--title":
-            logging.info("setting title to %s" % val)
-            plt.title(val)
-        elif opt == "--debug":
-            set_debug_level("debug")
-            module_logger.debug("set to debug level")
-        elif opt == "--info":
-            set_debug_level("info")
-            module_logger.debug("set to info level")
-        else:
-            option_name = opt
-            while option_name[0] == "-":
-                option_name = option_name[1:]
-            plotting_options[option_name] = val
+        # preprocessing
+        plotting_options = {}
+        for opt,val in opts:
+            module_logger.debug( "%s: %s" % ( opt, val ) )
+            if opt == "--color":
+                plotting_options["color"] = val
+            if opt == "--fmt":
+                plotting_options["fmt"] = val
 
 
-    bs = BSParser()
-    bs.parse( dataFileName )
-    bs.plot(**plotting_options)
+        bs = BSParser()
+        bs.parse( dataFileName )
+        bs.plot(**plotting_options)
 
-    if modify_xlim:
-        module_logger.info("setting xlimits to %s" % xlim)
-        xlimits = xlim.split( ":" )
-        plt.xlim( float( xlimits[0] ), float( xlimits[1] ) )
+        # postprocessing
+        for opt,val in opts:
+            module_logger.debug( "%s: %s" % ( opt, val ) )
+            if opt == "--pdf":
+                module_logger.info("saving to pdf")
+                outfileName = dataFileName.replace(".dat",".pdf")
+                plt.savefig(outfileName)
+            if opt == "--eps":
+                module_logger.info("saving to eps")
+                outfileName = dataFileName.replace(".dat",".eps")
+                plt.savefig(outfileName)
+            if opt == "--png":
+                module_logger.info("saving to png")
+                outfileName = dataFileName.replace(".dat",".png")
+                plt.savefig(outfileName)
+            if opt == "--xlim": 
+                module_logger.info("setting xlimits to %s" % val)
+                xlimits = vals.split( ":" )
+                plt.xlim( float( xlimits[0] ), float( xlimits[1] ) )
+            if opt == "--ylim": 
+                module_logger.info("setting ylimits to %s" % vals)
+                ylimits = vals.split(":")
+                plt.ylim(float( ylimits[0]), float(ylimits[1]))
+            if opt == "--title":
+                logging.info("setting title to %s" % val)
+                plt.title(val)
 
-    if modify_ylim:
-        module_logger.info("setting ylimits to %s" % ylim)
-        ylimits = ylim.split(":")
-        plt.ylim(float( ylimits[0]), float(ylimits[1]))
-
-    # save to eps
-    if save_eps:
-        module_logger.info("saving to pdf")
-        outfileName = dataFileName.replace(".dat",".eps")
-        plt.savefig(outfileName)
-
-    # save to pdf
-    if save_pdf:
-        module_logger.info("saving to pdf")
-        outfileName = dataFileName.replace(".dat",".pdf")
-        plt.savefig( outfileName )
-
-    # save to png
-    if save_png:
-        module_logger.info("saving to png")
-        outfileName = dataFileName.replace(".dat",".png")
-        plt.savefig( outfileName )
-
-    plt.show()
+        plt.show()
+    
+    except getopt.GetoptError:
+        usage()
