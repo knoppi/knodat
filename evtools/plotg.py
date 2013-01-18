@@ -12,7 +12,7 @@ import getopt
 import textwrap
 import logging
 
-from knodat.multimap import *
+import knodat.multimap as kmm
 import knodat.colors as my_cm
 
 module_logger = logging.getLogger("PLOTG")
@@ -202,7 +202,7 @@ def plotg(dataFileName, **opts):
             N = int(val)
 
     # fetch the data
-    data = MultiMap(dataFileName)
+    data = kmm.MultiMap(dataFileName)
     x,y,z,extent = data.retrieve_3d_plot_data("1", "2", z_col, grid = 'graphenegrid', N = N)
     plot_options["extent"] = extent
 
@@ -391,10 +391,13 @@ if __name__ == "__main__":
                                    ['eps','pdf','png','xlim=','ylim=','title=',
                                        'interpolation=', 'grid', "logarithmic",
                                        "help", "noaspect",'bilogarithmic=',
-                                       "contour", "levels="])
+                                       "contour", "levels=", "debug"])
 
         if ("--help", '') in opts:
             raise getopt.GetoptError("")
+        if ("--debug", "") in opts:
+            set_debug_level('debug')
+            kmm.set_debug_level('debug')
 
         if len(args) > 0 : dataFileName = args[0]
         else : dataFileName = "scalars.out"

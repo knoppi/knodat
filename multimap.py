@@ -170,10 +170,11 @@ class MultiMap:
         new_row = np.array(tuple(row), dtype=self.dataType)
         self.data = np.append( self.data, new_row )
 
+        # TODO Do this with functional programming
         try:
             self.set_x_column(self.x_column_name)
         except AttributeError, e:
-            module_logger.warning(e)
+            module_logger.info(e)
         except:
             raise
 
@@ -523,36 +524,47 @@ class MultiMap:
     def retrieve_3d_plot_data(self, _x, _y, _z, N = 2, *args, **kwargs):
         """ returns the needed matrices for creating a matplotlib-like 3d-plot
         """
-        restrictions = {}
-        if 'restrictions' in kwargs.keys():
+        try:
             restrictions = kwargs["restrictions"]
+        except KeyError:
+            restrictions = {}
+        except:
+            raise
 
-        grid = 'square'
-        if 'grid' in kwargs.keys():
+        try:
             grid = kwargs['grid']
+        except KeyError:
+            grid = 'square'
+        except:
+            raise
 
         deletion = False;
         if "deletion" in kwargs.keys():
             deletion = kwargs['deletion']
 
+        # retrieve the subset according to restrictions
         data = self.get_subset(restrictions = restrictions, deletion = deletion)
         data = np.sort(data, order=[_y, _x])
 
         x = np.unique(data[:][_x])
         y = np.unique(data[::-1][_y])
 
+
         # for graphene we have to reduce the x-dimension by a factor of 2
         X = np.zeros((1,1))
         Y = np.zeros((1,1))
         if grid == 'graphenegrid':
             module_logger.debug('assuming graphene grid')
+            T,Y = np.meshgrid(x[::2], y)
+            X = np.zeros(T.shape)
+            module_logger.debug('grid dimensions: %s' % (X.shape, ))
+            
             x0 = x[0]
             x1 = x[0] - x0
             x2 = x[1] - x0
             x3 = x[2] - x0
             x4 = x[3] - x0
-            T,Y = np.meshgrid(x[::2], y)
-            X = np.zeros(T.shape)
+            
             X[0::4] = T[0::4] + x1
             X[1::4] = T[1::4] + x2
             X[2::4] = T[2::4] + x3
@@ -563,21 +575,20 @@ class MultiMap:
 
         extent = ( x.min(), x.max(), y.min(), y.max() )
 
-        #X,Y = np.meshgrid( x, y )
         Z = np.zeros(X.shape)
-        #Z *= np.nan
-        ##X = np.zeros(Z.shape)
-        ##Y = np.zeros(Z.shape)
+        
         # NOTE missing values rot this reshaping, an additional method for that
         # case is the one commented out below, but this is by far less fast
-        difference = X.shape[0]*X.shape[1] - len(data[:][_z])
+        difference = Y.shape[0]*Y.shape[1] - len(data[:][_z])
         module_logger.debug('datapoints %i' % len(data[:][_z]))
-        module_logger.debug('grid size %i' % (X.shape[0]*X.shape[1]))
+        module_logger.debug('grid size %i' % (Y.shape[0]*Y.shape[1]))
         module_logger.debug('difference to optimum entry number %i' % difference)
-        data = np.sort(data, order=[_x, _y])
-        data  = np.append(data[:], data[-difference:])
-        data = np.sort(data, order=[_y, _x])
+        if difference > 0:
+            data = np.sort(data, order=[_x, _y])
+            data = np.append(data[:], data[-difference:])
+            data = np.sort(data, order=[_y, _x])
         
+        module_logger.debug('datapoints %i' % len(data[:][_z]))
         Z = data[:][_z].reshape(Y.shape)
         #if len(data[:][_z]) == X.shape[0]*X.shape[1]:
             #Z = data[:][_z].reshape(Y.shape)
