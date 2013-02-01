@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+# developers notes:
+# - http://packages.python.org/joblib/memory.html might speed up
+
 import numpy as np
 import scipy.signal as ssignal
 import matplotlib.pyplot as plt
@@ -54,13 +57,18 @@ def gauss_kern_1d(size):
 
 class MultiMap:
     def __init__(self, _fileName=None, _cols=None):
-        """initialization of the Multimap"""
+        """
+        Initialization of the Multimap
+        Optional parameters are _fileName and _cols.
+        """
         module_logger.info("MultiMap initialization:")
-        module_logger.info("... filename: %s" % _fileName)
+        module_logger.debug("-- filename: %s" % _fileName)
+        module_logger.debug("-- columns: %s" % _cols)
+
         self.commentIndicators = ['#']
         self.columns = []
         self.dataType = []
-        self.named_indices = False
+
         if not _cols == None:
             self.set_column_names(*_cols)
         if _fileName is not None:
@@ -69,14 +77,24 @@ class MultiMap:
             else:
                 self.read_file( _fileName )
 
+        # As long as we do not define a column to be the indexing column
+        # getitem_by_index should be chosen to retrieve a single row
+        self.getitem_method = self.getitem_by_index
+
         module_logger.debug("-- MultiMap initialized")
 
-    def __del__(self):
-        module_logger.debug("multimap deleted")
-
     def __getitem__(self, i):
-        """ retrieve a single row of the MultiMap as a dict """
-        module_logger.debug("MultiMap.__getitem__ calling element %s" % i)
+        """ 
+        Retrieve a single row of the MultiMap as a dict, i can either be an 
+        integer or a variable type key
+        """
+        return self.getitem_method(i)
+
+    def getitem_by_index(self, i):
+        """
+        This method is intended for internal use only, its purpose is to return
+        row i of the multimap as a dictionary.
+        """
         tmp = {}
 
         try:
@@ -117,6 +135,16 @@ class MultiMap:
                     "to %s" % (j2, j, i, value[j2]))
             self.data[i][j] = value[j2]
 
+    def getitem_by_x(self, i):
+        """
+        This method is for internal use only. It returns a single row of the
+        multimap as a dictionary defined by col_x = i
+        """
+        try:
+            j = self.x_column.index(i)
+            return self.getitem_by_index(j)
+        except Exception:
+            raise
 
     def __iter__(self):
         return iter(self.data)
@@ -156,6 +184,20 @@ class MultiMap:
 
         self.set_data_type(new_data_type)
 
+    def set_x_column(self, x_name):
+        """
+        This method declares a certain column of the MultiMap to act
+        as an index column, so __getitem__ takes a value of that column
+        as the index.
+        """
+        self.x_column_name = x_name
+        try:
+            self.x_column = self.get_column(x_name).tolist()
+        except Exception:
+            raise
+        else:
+            self.getitem_method = self.getitem_by_x
+
     def length(self):
         return self.data.shape[0]
 
@@ -183,6 +225,26 @@ class MultiMap:
         #new_row = self.__getitem__(self.keys[-1])
         #module_logger.debug("new row as ndarray is %s" % (new_row,))
         #module_logger.debug("new row as ndarray is %s" % (self.data,))
+
+        # TODO Do this with functional programming
+        try:
+            self.set_x_column(self.x_column_name)
+        except AttributeError, e:
+            module_logger.info(e)
+        except:
+            raise
+
+    def add_to_column(self, col, values):
+        try:
+            self.data[:,col] = self.data.column[:,col] + values.transpose()
+        except:
+            raise
+    
+    def multiply_column(self, col, factor):
+        try:
+            self.data[:,col] = self.data.column[:,col] * factor
+        except:
+            raise
 
     def read_file(self, filename, **options):
         """reads data from ascii file"""
@@ -323,10 +385,10 @@ class MultiMap:
 
         return result[desire]
 
-    def get_column( self, desire ):
+    def get_column(self, desire):
         """ returns column desire without applying any restriction
         """
-        return self.get_column_general( desire )
+        return self.data[:][desire]
 
     def get_subset(self, restrictions = {}, deletion = False):
         """ returns a subset of data with hard restrictions
@@ -515,36 +577,47 @@ class MultiMap:
     def retrieve_3d_plot_data(self, _x, _y, _z, N = 2, *args, **kwargs):
         """ returns the needed matrices for creating a matplotlib-like 3d-plot
         """
-        restrictions = {}
-        if 'restrictions' in kwargs.keys():
+        try:
             restrictions = kwargs["restrictions"]
+        except KeyError:
+            restrictions = {}
+        except:
+            raise
 
-        grid = 'square'
-        if 'grid' in kwargs.keys():
+        try:
             grid = kwargs['grid']
+        except KeyError:
+            grid = 'square'
+        except:
+            raise
 
         deletion = False;
         if "deletion" in kwargs.keys():
             deletion = kwargs['deletion']
 
+        # retrieve the subset according to restrictions
         data = self.get_subset(restrictions = restrictions, deletion = deletion)
         data = np.sort(data, order=[_y, _x])
 
         x = np.unique(data[:][_x])
         y = np.unique(data[::-1][_y])
 
+
         # for graphene we have to reduce the x-dimension by a factor of 2
         X = np.zeros((1,1))
         Y = np.zeros((1,1))
         if grid == 'graphenegrid':
             module_logger.debug('assuming graphene grid')
+            T,Y = np.meshgrid(x[::2], y)
+            X = np.zeros(T.shape)
+            module_logger.debug('grid dimensions: %s' % (X.shape, ))
+            
             x0 = x[0]
             x1 = x[0] - x0
             x2 = x[1] - x0
             x3 = x[2] - x0
             x4 = x[3] - x0
-            T,Y = np.meshgrid(x[::2], y)
-            X = np.zeros(T.shape)
+            
             X[0::4] = T[0::4] + x1
             X[1::4] = T[1::4] + x2
             X[2::4] = T[2::4] + x3
@@ -555,21 +628,20 @@ class MultiMap:
 
         extent = ( x.min(), x.max(), y.min(), y.max() )
 
-        #X,Y = np.meshgrid( x, y )
         Z = np.zeros(X.shape)
-        #Z *= np.nan
-        ##X = np.zeros(Z.shape)
-        ##Y = np.zeros(Z.shape)
+        
         # NOTE missing values rot this reshaping, an additional method for that
         # case is the one commented out below, but this is by far less fast
-        difference = X.shape[0]*X.shape[1] - len(data[:][_z])
+        difference = Y.shape[0]*Y.shape[1] - len(data[:][_z])
         module_logger.debug('datapoints %i' % len(data[:][_z]))
-        module_logger.debug('grid size %i' % (X.shape[0]*X.shape[1]))
+        module_logger.debug('grid size %i' % (Y.shape[0]*Y.shape[1]))
         module_logger.debug('difference to optimum entry number %i' % difference)
-        data = np.sort(data, order=[_x, _y])
-        data  = np.append(data[:], data[-difference:])
-        data = np.sort(data, order=[_y, _x])
+        if difference > 0:
+            data = np.sort(data, order=[_x, _y])
+            data = np.append(data[:], data[-difference:])
+            data = np.sort(data, order=[_y, _x])
         
+        module_logger.debug('datapoints %i' % len(data[:][_z]))
         Z = data[:][_z].reshape(Y.shape)
         #if len(data[:][_z]) == X.shape[0]*X.shape[1]:
             #Z = data[:][_z].reshape(Y.shape)
@@ -632,10 +704,6 @@ class MultiMap:
         y = np.unique(data[::-1][_y])
         u = (data[::][_u])
 
-        module_logger.debug("retrieve_quiver_plot_data, x-values: %s" % x)
-        module_logger.debug("retrieve_quiver_plot_data, y-values: %s" % y)
-        module_logger.debug('datapoints %s' % (u))
-
         # for graphene we have to reduce the x-dimension by a factor of 2
         X = np.zeros((1,1))
         Y = np.zeros((1,1))
@@ -664,8 +732,6 @@ class MultiMap:
         # NOTE missing values rot this reshaping, an additional method for that
         # case is the one commented out below, but this is by far less fast
         difference = X.shape[0]*X.shape[1] - len(data[:][_u])
-        module_logger.debug('datapoints %s' % (data[:][_u]))
-        module_logger.debug('grid size %i' % (X.shape[0]*X.shape[1]))
         module_logger.debug('difference to optimum entry number %i' % difference)
         data = np.sort(data, order=[_x, _y])
         data = np.append(data[:], data[-difference:])
