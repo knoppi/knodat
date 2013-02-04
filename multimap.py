@@ -219,8 +219,8 @@ class MultiMap:
         new_row = np.array(tuple(row), dtype=self.dataType)
         self.data = np.append(self.data, new_row)
 
-        if self.named_indices:
-            self.select_indexing_column(self.index_column)
+        #if self.named_indices:
+            #self.select_indexing_column(self.index_column)
 
         #new_row = self.__getitem__(self.keys[-1])
         #module_logger.debug("new row as ndarray is %s" % (new_row,))
@@ -611,13 +611,20 @@ class MultiMap:
             T,Y = np.meshgrid(x[::2], y)
             X = np.zeros(T.shape)
             module_logger.debug('grid dimensions: %s' % (X.shape, ))
-            
-            x0 = x[0]
-            x1 = x[0] - x0
-            x2 = x[1] - x0
-            x3 = x[2] - x0
-            x4 = x[3] - x0
-            
+
+            # let the x-shift depend on the y-coordinates:
+            # if the change in y is 1 / sqrt(3), there is
+            # no x-shift, otherwise, it is 0.5
+            x1 = 0.0
+            if y[1] - y[0] == 1 / np.sqrt(3):
+                x2 = 0.0
+                x3 = 0.5
+                x4 = 0.5
+            else:
+                x2 = 0.5
+                x3 = 0.5
+                x4 = 0.0
+
             X[0::4] = T[0::4] + x1
             X[1::4] = T[1::4] + x2
             X[2::4] = T[2::4] + x3
@@ -668,8 +675,8 @@ class MultiMap:
             yoffset = (Y.shape[0] % N) / 2
             Z = ssignal.convolve(Z, g, 'same')
 
-            X = X[yoffset::N,xoffset::N]
-            Y = Y[yoffset::N,xoffset::N]
+            #X = X[yoffset::N,xoffset::N]
+            #Y = Y[yoffset::N,xoffset::N]
             Z = Z[yoffset::N,xoffset::N]
         
         return (X, Y, Z, extent )

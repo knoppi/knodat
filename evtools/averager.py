@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+# averager.py
+# 2013
+
 import logging
 from scipy import *
 from scipy import optimize
@@ -9,11 +12,10 @@ from scipy.stats import sem
 
 import knodat.multimap as kmm
 
-# I set the logging to both logging to std out and to a file with
-# two different logging levels.
+# setup of logging, level can be adjusted by set_debug_level
 module_logger = logging.getLogger("averager")
 formatter = logging.Formatter(
-    fmt = "%(relativeCreated)d -- %(name)s -- %(levelname)s -- %(message)s" )
+    fmt = "%(asctime)s -- %(name)s -- %(levelname)s -- %(message)s" )
 
 ch = logging.StreamHandler()
 ch.setFormatter(formatter)
@@ -142,35 +144,37 @@ def calculateFromObject(T, outfileName, colsToAverage = ["_T"],
     # output columns are
     output_columns = [xCol]
     for y in colsToAverage:
-        output_columns.append( y )
-        output_columns.append( "error%s" % y )
-        output_columns.append( "rms%s" % y )
+        output_columns.append(y)
+        output_columns.append("error%s" % y)
+        output_columns.append("rms%s" % y)
+    
+    output_columns.append("ensemble_size")
 
-    module_logger.debug( ", ".join( output_columns ) )
-    O.set_column_names( *output_columns )
+    module_logger.debug(", ".join(output_columns))
+    O.set_column_names(*output_columns)
 
-    xvals = T.get_possible_values( xCol )
+    xvals = T.get_possible_values(xCol)
 
     for value in generalInformation:
-        constants[value] = T.get_possible_values( value )[0]
+        constants[value] = T.get_possible_values(value)[0]
 
     N = 0
     for x0 in xvals:
-        current_restrictions={ xCol : x0 }
+        current_restrictions={xCol : x0}
 
         outputline = [ x0 ]
         for y in colsToAverage:
             yvals = T.get_column_hard_restriction(y, **current_restrictions)
             N = yvals.shape[0]
             yaverage = np.average(yvals)
-            #yerror   = sem(yvals)
             yerror = np.mean(yvals) / np.sqrt(N)
             rms = np.sqrt(np.mean((yvals - yaverage)**2))
             outputline.extend([yaverage, yerror, rms])
 
+        outputline.append(N)
 
-        O.append_row( outputline )
-        #O.appendRow( np.array( tuple( outputline ), ndmin=2 ) )
+
+        O.append_row(outputline)
 
     module_logger.info("ensemble size: %i" % N)
     

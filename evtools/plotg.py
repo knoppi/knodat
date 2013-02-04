@@ -1,5 +1,12 @@
 #!/usr/bin/env python
 
+# plotg.py
+# plot scalar values on a graphene grid
+# TODO: matplotlib defines the origin of color-encoded plots
+# by default to lie in the upper left corner, for this script
+# it is crucial that the origin lies in the lower left corner
+# find some workaround for this
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
