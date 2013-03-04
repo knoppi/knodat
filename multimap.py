@@ -234,6 +234,12 @@ class MultiMap:
         except:
             raise
 
+    def append_data(self, other):
+        try:
+            self.data = np.append(self.data, other.data)
+        except:
+            raise
+
     def add_to_column(self, col, values):
         try:
             self.data[:,col] = self.data.column[:,col] + values.transpose()
@@ -390,6 +396,10 @@ class MultiMap:
         """
         return self.data[:][desire]
 
+    def mean(self, column):
+        tmp = self.get_column(column)
+        return self.mean
+
     def get_subset(self, restrictions = {}, deletion = False):
         """ returns a subset of data with hard restrictions
         """
@@ -400,8 +410,9 @@ class MultiMap:
             restriction_lhs.append( key )
             restriction_rhs.append( restrictions[key] )
 
-        zero = 1e-2
+        zero = 1e-5
         _lambda = lambda n,x: (x == restriction_rhs[n])
+        _lambda = lambda n,x: np.abs(x - restriction_rhs[n]) < zero
 
         result = self.data[:]
 
@@ -521,7 +532,7 @@ class MultiMap:
         if N > 1:
             g = gauss_kern_1d(N)
             module_logger.debug(g)
-            xvals = ssignal.convolve(xvals, g, 'same')
+            #xvals = ssignal.convolve(xvals, g, 'same')
             yvals = ssignal.convolve(yvals, g, 'same')
 
  
