@@ -212,7 +212,7 @@ def plotg(dataFileName, **opts):
 
     # fetch the data
     data = kmm.MultiMap(dataFileName)
-    x,y,z,extent = data.retrieve_3d_plot_data(x_col, y_col, z_col, grid = 'graphenegrid', N = N,
+    x,y,z,extent = data.retrieve_3d_plot_data(x_col, y_col, z_col, N = N,
             data_is_complete = data_is_complete)
     plot_options["extent"] = extent
 
@@ -344,8 +344,8 @@ def plotg(dataFileName, **opts):
 
     # save to pdf
     if save_pdf:
-        if debug: print "saving to pdf"
         outfileName = dataFileName.replace(".dat",".pdf")
+        outfileName = outfileName.replace(".out",".pdf")
         plt.savefig( outfileName )
 
     # save to png
