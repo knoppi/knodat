@@ -1,12 +1,5 @@
 #!/usr/bin/env python
 
-# plotg.py
-# plot scalar values on a graphene grid
-# TODO: matplotlib defines the origin of color-encoded plots
-# by default to lie in the upper left corner, for this script
-# it is crucial that the origin lies in the lower left corner
-# find some workaround for this
-
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -219,7 +212,7 @@ def plotg(dataFileName, **opts):
 
     # fetch the data
     data = kmm.MultiMap(dataFileName)
-    x,y,z,extent = data.retrieve_3d_plot_data(x_col, y_col, z_col, grid = 'graphenegrid', N = N,
+    x,y,z,extent = data.retrieve_3d_plot_data(x_col, y_col, z_col, N = N,
             data_is_complete = data_is_complete)
     plot_options["extent"] = extent
 
@@ -351,8 +344,8 @@ def plotg(dataFileName, **opts):
 
     # save to pdf
     if save_pdf:
-        if debug: print "saving to pdf"
         outfileName = dataFileName.replace(".dat",".pdf")
+        outfileName = outfileName.replace(".out",".pdf")
         plt.savefig( outfileName )
 
     # save to png
