@@ -325,6 +325,40 @@ class MultiMap:
         '''writes the content of the MultiMap in numpy-style .npy file'''
         np.save(filename, self.data)
 
+    def write_file_for_gnuplot_splot(self, _x, _y, _filename):
+        """ when doing surface plots with gnuplot there have to be empty lines 
+            in the data file after each isoline which can be achieved by this
+            method
+        """
+        self.sort(np.str(_x))
+        self.sort(np.str(_y))
+        
+        outfile = open(_filename, 'w')
+
+        # head line containing the description of the file, i.e. the
+        # dolumn names
+        column_names = ' '.join( ["%s" % k for k in self.columns])
+        line = "".join((self.commentIndicators[0], self.commentIndicators[0], 
+                        " ", column_names, "\n"))
+        outfile.write( line )
+
+        # write data line by line and check if x has been increased
+        current_x = self.data[0][_x]
+        for iline in range( self.data.shape[0] ):
+            current_line = self.data[iline]
+
+            if not current_line[_x] == current_x:
+                outfile.write("\n")
+                current_x = current_line[_x]
+
+            line = ""
+            for x in current_line:
+                line += np.str_( x ) + " "
+            line = line+"\n"
+            outfile.write( line )
+
+        module_logger.debug("finished writing file in gnuplot style")
+
     def read_file_numpy_style(self, filename):
         '''loads content into the MultiMap which was formerly saved as a
         numpy style .npy file'''
@@ -590,7 +624,8 @@ class MultiMap:
                     yerr = yerrs, label = label, fmt = fmt )
         return line
 
-    def retrieve_3d_plot_data(self, _x, _y, _z, N = 2, *args, **kwargs):
+    def retrieve_3d_plot_data(self, _x, _y, _z, N = 2, data_is_complete = True, 
+            *args, **kwargs):
         """ returns the needed matrices for creating a matplotlib-like 3d-plot
         """
         try:
@@ -653,35 +688,26 @@ class MultiMap:
 
         Z = np.zeros(X.shape)
         
-        # NOTE missing values rot this reshaping, an additional method for that
-        # case is the one commented out below, but this is by far less fast
-        difference = Y.shape[0]*Y.shape[1] - len(data[:][_z])
-        module_logger.debug('datapoints %i' % len(data[:][_z]))
-        module_logger.debug('grid size %i' % (Y.shape[0]*Y.shape[1]))
-        module_logger.debug('difference to optimum entry number %i' % difference)
-        if difference > 0:
-            data = np.sort(data, order=[_x, _y])
-            data = np.append(data[:], data[-difference:])
-            data = np.sort(data, order=[_y, _x])
-        
-        module_logger.debug('datapoints %i' % len(data[:][_z]))
-        Z = data[:][_z].reshape(Y.shape)
-        #if len(data[:][_z]) == X.shape[0]*X.shape[1]:
-            #Z = data[:][_z].reshape(Y.shape)
-        #else:
-            #for row in data:
-                #xi = 0
-                #if grid == 'graphenegrid':
-                    #xi = int(np.where(x == row[_x])[0][0] / 2)
-                #else:
-                    #xi = int(np.where(x == row[_x])[0][0])
-                #yi, = np.where(y == row[_y])[0]
-#
-                #X[yi,xi] = row[_x]
-                #Y[yi,xi] = row[_y]
-                #Z[yi,xi] = row[_z]
-
-                #xi += 1
+        if data_is_complete == False:
+            for row in data:
+                xi = 0
+                xi = int(np.where(x == row[_x])[0][0])
+                yi, = np.where(y == row[_y])[0]
+                Z[yi,xi] = row[_z]
+        else:
+            # NOTE missing values rot this reshaping, an additional method for that
+            # case is the one commented out below, but this is by far less fast
+            difference = Y.shape[0]*Y.shape[1] - len(data[:][_z])
+            module_logger.debug('datapoints %i' % len(data[:][_z]))
+            module_logger.debug('grid size %i' % (Y.shape[0]*Y.shape[1]))
+            module_logger.debug('difference to optimum entry number %i' % difference)
+            if difference > 0:
+                data = np.sort(data, order=[_x, _y])
+                data = np.append(data[:], data[-difference:])
+                data = np.sort(data, order=[_y, _x])
+            
+            module_logger.debug('datapoints %i' % len(data[:][_z]))
+            Z = data[:][_z].reshape(Y.shape)
                 
         xoffset = 0
         yoffset = 0
