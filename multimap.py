@@ -81,6 +81,9 @@ class MultiMap:
         # getitem_by_index should be chosen to retrieve a single row
         self.getitem_method = self.getitem_by_index
 
+        # we need a numerical zero
+        self.zero = 1e-10
+
         module_logger.debug("-- MultiMap initialized")
 
     def __getitem__(self, i):
@@ -89,6 +92,28 @@ class MultiMap:
         integer or a variable type key
         """
         return self.getitem_method(i)
+
+    def __setitem__(self, key, value):
+        # possible error checking:
+        # - key valid (type, index valid)
+        # - value is dict and has correct dType
+        module_logger.debug("__setitem__(%s, %s)" % (key, value))
+        try:
+            module_logger.debug("trying to find the key in the key list")
+            i = self.keys.index(key)
+        except AttributeError as e:
+            module_logger.debug("Exception %s" % e)
+            module_logger.debug("assuming no key list been given")
+        except ValueError as e:
+            module_logger.warning("key %s not in key list" % key)
+
+        for j, j2 in enumerate(self.columns):
+            module_logger.debug("... setting element '%s' (%i) in row %i "
+                    "to %s" % (j2, j, i, value[j2]))
+            self.data[i][j] = value[j2]
+
+    def __iter__(self):
+        return iter(self.data)
 
     def getitem_by_index(self, i):
         """
@@ -116,25 +141,6 @@ class MultiMap:
             module_logger.warning(e)
         return tmp
 
-    def __setitem__(self, key, value):
-        # possible error checking:
-        # - key valid (type, index valid)
-        # - value is dict and has correct dType
-        module_logger.debug("__setitem__(%s, %s)" % (key, value))
-        try:
-            module_logger.debug("trying to find the key in the key list")
-            i = self.keys.index(key)
-        except AttributeError as e:
-            module_logger.debug("Exception %s" % e)
-            module_logger.debug("assuming no key list been given")
-        except ValueError as e:
-            module_logger.warning("key %s not in key list" % key)
-
-        for j, j2 in enumerate(self.columns):
-            module_logger.debug("... setting element '%s' (%i) in row %i "
-                    "to %s" % (j2, j, i, value[j2]))
-            self.data[i][j] = value[j2]
-
     def getitem_by_x(self, i):
         """
         This method is for internal use only. It returns a single row of the
@@ -145,9 +151,6 @@ class MultiMap:
             return self.getitem_by_index(j)
         except Exception:
             raise
-
-    def __iter__(self):
-        return iter(self.data)
 
     def getitem(self, i):
         """ retrieve a single row of the MultiMap as a dict """
@@ -163,6 +166,8 @@ class MultiMap:
         except None:
             module_logger.fatal("chosen invalid key-column")
 
+    def set_zero(self, value):
+        self.zero = value
     def set_column_names(self, *keyw, **options):
         """sets the names of the columns and - if needed - the
         corresponding dtype, this will also clear the data,
@@ -412,7 +417,7 @@ class MultiMap:
 
         zero = 1e-5
         _lambda = lambda n,x: (x == restriction_rhs[n])
-        _lambda = lambda n,x: np.abs(x - restriction_rhs[n]) < zero
+        _lambda = lambda n,x: np.abs(x - restriction_rhs[n]) < self.zero
 
         result = self.data[:]
 

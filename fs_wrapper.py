@@ -64,6 +64,7 @@ def extract_parameters_from_filename(filename, tail = 2):
 
     information = filename.split( "_" )
     results = {}
+    results["orientation"] = information[0][2:]
     for i in range( (len(information) - tail) / 2 ):
         key = information[ 2 * i + 1 ]
         value =  float( information[ 2 * i + 2 ].replace( "p","." ) )
