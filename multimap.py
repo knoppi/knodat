@@ -115,6 +115,14 @@ class MultiMap:
     def __iter__(self):
         return iter(self.data)
 
+    def describe(self):
+        print self.filename
+        for item in self.dataType.descr:
+            print ("%20s: %s" % (item[0], item[1]))
+        #print self.dataType.descr
+
+        print "MultiMap contains %i entries" % self.length()
+
     def getitem_by_index(self, i):
         """
         This method is intended for internal use only, its purpose is to return
@@ -259,6 +267,7 @@ class MultiMap:
 
     def read_file(self, filename, **options):
         """reads data from ascii file"""
+        self.filename = filename
         for (key,val) in options:
             if key == "delimiter": 
                 self.separator = val
@@ -362,7 +371,9 @@ class MultiMap:
     def read_file_numpy_style(self, filename):
         '''loads content into the MultiMap which was formerly saved as a
         numpy style .npy file'''
+        self.filename = filename
         self.data = np.load(filename)
+        self.dataType = self.data.dtype
 
     def get_minimum_value(self, column, absolute = False):
         '''finds the element in column with the least (absolute) value'''
@@ -449,9 +460,8 @@ class MultiMap:
             restriction_lhs.append( key )
             restriction_rhs.append( restrictions[key] )
 
-        zero = 1e-5
-        _lambda = lambda n,x: (x == restriction_rhs[n])
         _lambda = lambda n,x: np.abs(x - restriction_rhs[n]) < self.zero
+        _lambda_general = lambda n,x: (x == restriction_rhs[n])
 
         result = self.data[:]
 
@@ -459,8 +469,15 @@ class MultiMap:
 
         i = 0
         for rest_name in restriction_lhs:
-            result = result[ np.where( _lambda( i, result[:][rest_name] ) ) ]
-            indices = indices[ np.where( _lambda( i, result[:][rest_name] ) ) ]
+            try:
+                result = result[ np.where( _lambda( i, result[:][rest_name] ) ) ]
+                indices = indices[ np.where( _lambda( i, result[:][rest_name] ) ) ]
+            except TypeError:
+                # most probably the variable is no float
+                result = result[ np.where( _lambda_general( i, result[:][rest_name] ) ) ]
+                indices = indices[ np.where( _lambda_general( i, result[:][rest_name] ) ) ]
+            except:
+                raise
             i += 1
 
         if deletion: 
@@ -560,7 +577,7 @@ class MultiMap:
         module_logger.debug( 
                 "retrieving plot data %s vs %s" % ( _colx, _coly ) )
         module_logger.debug( "errorbars are %s, %s" % ( errx, erry ) )
-        self.sort( _colx )
+        self.sort(_colx)
         xvals = self.get_column_hard_restriction( _colx, **restrictions )
         yvals = self.get_column_hard_restriction( _coly, **restrictions )
         xerrs = ( 0 if errx == None else 

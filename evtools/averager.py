@@ -42,7 +42,7 @@ constants = {}
 
 # assuming simple 1/L-diffusive behaviour
 ###############################################################################
-diffT = lambda p, x: constants['c1'] / (1.0 + x/p[0] )
+diffT = lambda p, x, N: N / (1.0 + x/p[0] )
 diffusion_parameters = [1000]
 
 # if we assume a localized transport regime an exponential decay
@@ -53,81 +53,114 @@ localization_parameters = [10,10000]
 
 # For the spin transport we also asume an exponential decay
 ###############################################################################
-spinT = lambda p, x: p[0] * exp( - x / p[1])
-spinT_parameters = [0.5, 1000]
+spinT = lambda p, x, D, N: p[0] * N * p[1] / 2.0 / D * exp( - x / p[1])
+#spinT = lambda p, x, D: p[0] * exp( - x / p[1])
+spinT_parameters = [1, 100]
 
 # specialized function to do all the fancy averaging stuff with the particular
 # goal to get insight into spin transport of a given system
 ###############################################################################
 def calculate_spin_transmission(dataFileName, 
         columns = ['L', 'T', 'Tuu', 'Tdu', 'Tud', 'Tdd', 'c1' ],
-        colsToAverage = ["T", 'polarization', 'relaxationrate', "Ttemp"],
-        colsToFit = ["T","Tlog","polarization"],
-        xCol = "L",
-        shapeTransmission = [diffT, expT, spinT], 
-        shapeParameters = [diffusion_parameters, localization_parameters, 
-            spinT_parameters],
-        generalInformation = ['c1']):
-    module_logger.info("averaging data in file %s" % dataFileName)
-    
+        colsToAverage = ["T", 'Tsu', 'Tsd'],
+        colsToFit = ["T","Tsu","Tsd"],
+        xCol = "L"):
     # the input data
     ###########################################################################
     T = kmm.MultiMap()
-    T.set_column_names( *columns )
+    T.set_column_names(*columns)
     T.read_file( dataFileName )
 
     # add new columns for spin transmission, spin relaxation and
     # potentially localized charge transport
     ###########################################################################
-    spinTransmission = lambda uu,du,t : ( uu - du ) / t
-    neededColumns = ['Tuu', 'Tdu', 'T']
-    newName = "polarization"
-    T.add_column( newName, origin = neededColumns,
-            connection = spinTransmission )
-
-    relaxationrate = lambda uu,du : du / uu
+    spinTransmission = lambda sc,sf: sc - sf
+    
     neededColumns = ['Tuu', 'Tdu']
-    newName = "relaxationrate"
-    T.add_column( newName, origin = neededColumns,
-            connection = relaxationrate )
+    newName = "Tsu"
+    T.add_column(newName, origin = neededColumns, connection = spinTransmission)
 
-    # and the logarithm of the transmission
-    T.add_column('Ttemp', origin = ['T'], connection = log)
+    neededColumns = ['Tdd', 'Tud']
+    newName = "Tsd"
+    T.add_column(newName, origin = neededColumns, connection = spinTransmission)
 
     # do the averaging
     ###########################################################################
     outfileName = dataFileName.replace(".out",".dat")
-    calculateFromObject(T, outfileName,
-            colsToAverage = colsToAverage,
-            colsToFit = [], xCol = xCol,
-            generalInformation = generalInformation)
+    calculateFromObject(T, outfileName, colsToAverage = colsToAverage,
+        colsToFit = [], xCol = xCol)
 
     # load the file with the averaged data
     ###########################################################################
     O = kmm.MultiMap(outfileName)
-    
-    # add one new row for the localized regime
-    O.add_column('Tlog', origin = ["Ttemp"], connection = exp)
 
+    # fetch the number of open channels
+    array_of_Ns = T.get_column("c1")
+    average_N = array_of_Ns.mean()
+    variance_N = np.sqrt(np.mean((array_of_Ns - average_N)**2))
+
+    if not variance_N == 0:
+        module_logger.warning("number of channels not constant")
+
+    
     # do fitting
-    result = []
-    xvals = O.get_possible_values( xCol )
-    
-    for i, column in enumerate(colsToFit):
-        yvals = O.get_column(column)
-        
-        module_logger.debug("xvals.shape: %s" % (xvals.shape,))
-        module_logger.debug("yvals.shape: %s" % (yvals.shape,))
+    ###########################################################################
+    xvals = O.get_possible_values(xCol)
 
-        err = lambda p, x, y: y - shapeTransmission[i](p, x)
-        par = shapeParameters[i]
-        args = (xvals, yvals)
-        
-        output, success = optimize.leastsq(err, par, args = args)
-        result.append(output)
+    # charge transport for mean-free path and diffusion constant
+    yvals = O.get_column("T")
+    err = lambda p, x, y: y - diffT(p, x, average_N)
+    start_parameters = diffusion_parameters
 
-    result.append(constants)
+    final_parameters, success = optimize.leastsq(
+            err, start_parameters, args = (xvals, yvals))
 
+    # l is the RMT-transport length in units of a
+    l = final_parameters[0]
+    # rescaling according to scaling theory gives the transport theory mean
+    # free path, again in units of a
+    ltr = 2 * l / np.pi
+    # the diffusion constant can be calculated as D = v_F * ltr / 2
+    # to stay conform with the units we use v_F = 1
+    # so D is given in units of v_F * a
+    D = ltr / 2.0
+
+    # spin transport
+    err = lambda p, x, y: y - spinT(p, x, D, average_N)
+    start_parameters = spinT_parameters
+
+    # spin up
+    yvals = O.get_column("Tsu")
+    final_parameters, success = optimize.leastsq(
+            err, start_parameters, args = (xvals, yvals))
+    Cu = final_parameters[0]
+    LSu = final_parameters[1]
+
+    # spin down
+    yvals = O.get_column("Tsd")
+    final_parameters, success = optimize.leastsq(
+            err, start_parameters, args = (xvals, yvals))
+    Cd = final_parameters[0]
+    LSd = final_parameters[1]
+
+    # Now the fit parameters of the two spin components are compared
+    # If the deviation is larger than 5%, a warning is plotted:
+    deviationC = np.abs(Cu / Cd - 1)
+    deviationLS = np.abs(LSu / LSd - 1)
+    module_logger.info("deviation between spin up and down channel: %g / %g" % (deviationC, deviationLS))
+    if deviationC > 0.05 or deviationLS > 0.05:
+        module_logger.warning("results for spin up and spin differ by" 
+                " %i and %i, respectively" % 
+                (deviationC * 100, deviationLS * 100))
+
+    C = (Cu + Cd) / 2.0
+    LS = (LSu + LSd) / 2.0
+
+    # LS is given in units of a, we also calculate tau_s which according 
+    # to our definition of D then is given in a / v_F
+    tauS = LS**2 / D
+
+    result = (average_N, ltr, D, C, LS, tauS)
     return result
 
 def calculateFromObject(T, outfileName, colsToAverage = ["_T"], 
