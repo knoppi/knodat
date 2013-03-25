@@ -200,7 +200,7 @@ def calculateFromObject(T, outfileName, colsToAverage = ["_T"],
             yvals = T.get_column_hard_restriction(y, **current_restrictions)
             N = yvals.shape[0]
             yaverage = np.average(yvals)
-            yerror = np.mean(yvals) / np.sqrt(N)
+            yerror = np.std(yvals) / np.sqrt(N)
             rms = np.sqrt(np.mean((yvals - yaverage)**2))
             outputline.extend([yaverage, yerror, rms])
 
@@ -241,7 +241,7 @@ def calculate( dataFileName, cols = ['_L','_T','_c1'],
     outfileName = dataFileName.replace(".out",".dat")
 
     module_logger.debug( "%s --> %s" % ( dataFileName,  outfileName ) )
-    T = MultiMap()  # input data
+    T = kmm.MultiMap()  # input data
 
     T.set_column_names( *cols )
     T.read_file( dataFileName )
