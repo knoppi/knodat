@@ -60,11 +60,15 @@ spinT_parameters = [1, 100]
 # specialized function to do all the fancy averaging stuff with the particular
 # goal to get insight into spin transport of a given system
 ###############################################################################
-def calculate_spin_transmission(dataFileName, 
-        columns = ['L', 'T', 'Tuu', 'Tdu', 'Tud', 'Tdd', 'c1' ],
-        colsToAverage = ["T", 'Tsu', 'Tsd'],
-        colsToFit = ["T","Tsu","Tsd"],
-        xCol = "L"):
+def calculate_spin_transmission(
+        dataFileName, 
+        columns = ['L', 'T', 'Tuu', 'Tud', 'Tdu', 'Tdd', 'c1']
+        ):
+    # assign some names to interesting values
+    colsToAverage = ["T", 'Tsu', 'Tsd']
+    colsToFit = ["T","Tsu","Tsd"]
+    xCol = "L"
+
     # the input data
     ###########################################################################
     T = kmm.MultiMap()
@@ -150,7 +154,7 @@ def calculate_spin_transmission(dataFileName,
     module_logger.info("deviation between spin up and down channel: %g / %g" % (deviationC, deviationLS))
     if deviationC > 0.05 or deviationLS > 0.05:
         module_logger.warning("results for spin up and spin differ by" 
-                " %i and %i, respectively" % 
+                "DC =  %i %% and DLS = %i %%, respectively" % 
                 (deviationC * 100, deviationLS * 100))
 
     C = (Cu + Cd) / 2.0
