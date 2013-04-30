@@ -33,6 +33,7 @@ def set_debug_level(level):
             fatal = logging.FATAL)
     ch.setLevel(possible_levels[level])
     module_logger.setLevel(possible_levels[level])
+    kmm.set_debug_level(level)
 
 
 # constants of a transmission curve (like number of channels) can be 
