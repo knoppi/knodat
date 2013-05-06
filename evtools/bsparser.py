@@ -5,6 +5,7 @@ import logging
 import matplotlib
 import matplotlib.pyplot as plt
 import textwrap
+import numpy as np
 
 import knodat.multimap as kmm
 
@@ -118,60 +119,81 @@ class BSParser:
     def showBS( self ):
         plt.show()
 
-    def bandgap( self ):
-        """ calculates the bandgap(s) """
-        gap = list()
-        highest_valence_band = 0
-        lowest_conduction_band = 0
+    def bandgap(self, threshold = 1e-6):
+        """ calculates the bandgap(s)
+            We therefore distinguish between bands (as conduction or
+            valuence band) and dispersions of the single modes.
+            The single modes are checked for the energy for the
+            energy interval they're occupying, then they are compared with
+            the given bands. Three cases can occur:
+            1) no overlap with any of the given bands
+               -> create a new band
+            2) finite overlap with one band
+               -> assign the mode to this band, possibly extending its range
+            3) finite overlap with several bands
+               -> combine all those bands, with a possibly increased range
+        """
 
-        # lists containing the bands' boundaries
-        lower_bounds = DataArray()
-        upper_bounds = DataArray()
+        bands = []
 
-        # iteration over all the bands
         for i in range( 1, self.number_of_columns+1 ):
             column_name = ( '_b%i' % i )
-            this_band = DataArray( self.bs.get_column( column_name ) )
+            
+            lower_limit = self.bs.get_minimum_value(column_name)
+            upper_limit = self.bs.get_maximum_value(column_name)
 
-            lower_bound_of_this_band = this_band.minValue()
-            upper_bound_of_this_band = this_band.maxValue()
+            overlaps_with = []
+            for iband, band in enumerate(bands):
+                if lower_limit > band[0] and lower_limit < band[1]:
+                    overlaps_with.append(iband)
+                elif upper_limit > band[0] and upper_limit < band[1]:
+                    overlaps_with.append(iband)
+                elif band[0] > lower_limit and band[0] < upper_limit:
+                    overlaps_with.append(iband)
+                elif band[1] > lower_limit and band[1] < upper_limit:
+                    overlaps_with.append(iband)
+                else:
+                    pass
 
-            lower_bounds.append( lower_bound_of_this_band )
-            upper_bounds.append( upper_bound_of_this_band )
+            # helping function defined here as for limited validity
+            def assign_interval_to_band(interval, band_index, bands):
+                overlapping_band = bands[band_index]
+                new_lower_band_limit = min(interval[0], overlapping_band[0])
+                new_upper_band_limit = max(interval[1], overlapping_band[1])
 
-        # container for the results
+                bands[band_index] = (new_lower_band_limit, new_upper_band_limit)
+                return (new_lower_band_limit, new_upper_band_limit)
+
+
+            current_interval = (lower_limit, upper_limit)
+            if len(overlaps_with) == 0:
+                bands.append(current_interval)
+            elif len(overlaps_with) == 1:
+                assign_interval_to_band(current_interval, overlaps_with[0], bands)
+            else:
+                overlaps_with.reverse()
+
+                for iband in overlaps_with:
+                    current_interval = assign_interval_to_band(current_interval, iband, bands)
+                    del bands[iband]
+
+                bands.append(current_interval)
+
+        # now sort the bands by their minimum
+        bands.sort(key = lambda interval: interval[0])
+
         gaps = []
-        final_bands = []
+        for iband, band in enumerate(bands[:-1]):
+            try:
+                gap = bands[iband + 1][0] - band[1]
 
-        current_lower = lower_bounds.minValue()
-        current_upper = upper_bounds[lower_bounds.minKey()]
-
-        while lower_bounds.numberOfEntries() > 0:
-            this_band_index = lower_bounds.minKey()
-            this_band_lower = lower_bounds.minValue()
-            this_band_upper = upper_bounds[this_band_index]
-            if this_band_lower > current_upper:
-                # new gap found:
-                gaps.append( this_band_lower - current_upper )
-                final_bands.append( (current_lower, current_upper ) )
-                current_lower = this_band_lower
-                current_upper = this_band_upper
-                lower_bounds.remove( this_band_index )
-                upper_bounds.remove( this_band_index )
-                continue
-            elif this_band_lower <= current_upper:
-                if this_band_upper <= current_upper:
-                    # nothing interesting
-                    lower_bounds.remove( this_band_index )
-                    upper_bounds.remove( this_band_index )
-                    continue
-                elif this_band_upper > current_upper:
-                    # shift current upper
-                    current_upper = this_band_upper
-                    lower_bounds.remove( this_band_index )
-                    upper_bounds.remove( this_band_index )
-
-        return final_bands, gaps
+                # we're only interested in bands above a given threshold
+                if gap > threshold:
+                    gaps.append(gap)
+            except:
+                raise
+        
+        return bands, gaps
 
 def usage():
     print textwrap.dedent("""\
@@ -181,6 +203,7 @@ def usage():
     quantum structures
 
     Mandatory arguments to long options are mandatory for short options too.
+        --gaps, -g              determines the bands and gaps and plots them
         --eps                   saves the plot as an eps file
         --pdf                   saves the plot as a pdf file
         --png                   saves the plot as a png file
@@ -204,9 +227,10 @@ if __name__ == '__main__':
     import getopt, sys
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], '', 
+        opts, args = getopt.getopt(sys.argv[1:], 'g', 
                                    ['eps','pdf','png','xlim=','ylim=','title=',
-                                    'color=','fmt=', "debug", "info", "help"])
+                                    'color=','fmt=', "debug", "info", "help",
+                                    "gaps"])
         if len(args) > 0 : dataFileName = args[0]
         else : dataFileName = "transmission.out"
 
@@ -220,6 +244,8 @@ if __name__ == '__main__':
         if ("--debug", '') in opts:
                 set_debug_level("debug")
 
+        calculate_gaps = False
+
         # preprocessing
         plotting_options = {}
         for opt,val in opts:
@@ -229,10 +255,16 @@ if __name__ == '__main__':
             if opt == "--fmt":
                 plotting_options["fmt"] = val
 
+            if opt == "--gaps" or opt == "-g":
+                calculate_gaps = True
+
 
         bs = BSParser()
         bs.parse( dataFileName )
         bs.plot(**plotting_options)
+
+        if calculate_gaps == True:
+            print bs.bandgap()
 
         # postprocessing
         for opt,val in opts:

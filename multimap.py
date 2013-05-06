@@ -366,10 +366,26 @@ class MultiMap:
         else:
             return np.amin(self.data[:][column])
 
+    def get_maximum_value(self, column, absolute = False):
+        '''finds the element in column with the least (absolute) value'''
+        if absolute is True:
+            return np.amax(np.abs(self.data[:][column]))
+        else:
+            return np.amax(self.data[:][column])
+
     def get_x_of_minimum_value(self, x_column, y_column, absolute = False):
         '''returns value of x_column where (absolute) of y_column has its
            minimum'''
         y_value = self.get_minimum_value(y_column, absolute)
+        restriction = {y_column: y_value}
+        x_values = self.get_column_hard_restriction(x_column, **restriction)
+
+        return (x_values, y_value)
+
+    def get_x_of_maximum_value(self, x_column, y_column, absolute = False):
+        '''returns value of x_column where (absolute) of y_column has its
+           minimum'''
+        y_value = self.get_maximum_value(y_column, absolute)
         restriction = {y_column: y_value}
         x_values = self.get_column_hard_restriction(x_column, **restriction)
 
