@@ -61,8 +61,9 @@ def extract_parameters_from_filename(filename, tail = 2):
     physical parameters are in between, so the return value is the dictionary:
     {'W' : 190, 'L' : 3700, 'E' : 0.11, 'lambdaBR' : 0.01, 'DeltaSO' : 0.001}
     """
+    tmp = filename.split("/")[-1]
 
-    information = filename.split( "_" )
+    information = tmp.split( "_" )
     results = {}
     results["orientation"] = information[0][2:]
     for i in range( (len(information) - tail) / 2 ):
