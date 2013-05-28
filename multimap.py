@@ -776,7 +776,7 @@ class MultiMap:
         if data_is_complete == False:
             for row in data:
                 xi = 0
-                xi = int(np.where(x == row[_x])[0][0])
+                xi = int(np.where(x == row[_x])[0][0] / 2) 
                 yi, = np.where(y == row[_y])[0]
                 Z[yi,xi] = row[_z]
         else:

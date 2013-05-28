@@ -351,7 +351,6 @@ def plotg(dataFileName, **opts):
 
     # save to pdf
     if save_pdf:
-        if debug: print "saving to pdf"
         outfileName = dataFileName.replace(".dat",".pdf")
         plt.savefig( outfileName )
 
