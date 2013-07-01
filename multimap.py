@@ -554,10 +554,10 @@ class MultiMap:
 
         module_logger.debug("finished writing file in gnuplot style")
 
-    def read_file_numpy_style(self, filename):
-        '''loads content into the MultiMap which was formerly saved as a
-        numpy style .npy file'''
-        self.data = np.load(filename)
+    #def read_file_numpy_style(self, filename):
+        #'''loads content into the MultiMap which was formerly saved as a
+        #numpy style .npy file'''
+        #self.data = np.load(filename)
 
     def get_minimum_value(self, column, absolute = False):
         '''finds the element in column with the least (absolute) value'''

@@ -56,17 +56,24 @@ localization_parameters = [10,10000]
 ###############################################################################
 spinT = lambda p, x, D, N: p[0] * N * p[1] / 2.0 / D * exp( - x / p[1])
 #spinT = lambda p, x, D: p[0] * exp( - x / p[1])
-spinT_parameters = [1, 100]
+spinT_parameters = [1, 8000]
 
 # specialized function to do all the fancy averaging stuff with the particular
 # goal to get insight into spin transport of a given system
+# returns:
+# - average_N
+# - ltr
+# - D
+# - C
+# - LS
+# - tauS
 ###############################################################################
 def calculate_spin_transmission(
         dataFileName, 
         columns = ['L', 'T', 'Tuu', 'Tud', 'Tdu', 'Tdd', 'c1']
         ):
     # assign some names to interesting values
-    colsToAverage = ["T", 'Tsu', 'Tsd']
+    colsToAverage = ["T", 'Tsu', 'Tsd', 'Ts']
     colsToFit = ["T","Tsu","Tsd"]
     xCol = "L"
 
@@ -79,15 +86,21 @@ def calculate_spin_transmission(
     # add new columns for spin transmission, spin relaxation and
     # potentially localized charge transport
     ###########################################################################
-    spinTransmission = lambda sc,sf: sc - sf
+    spinTransmission = lambda sc, sf, total: sc - sf - total / 2.0
+    spinTransmission = lambda sc, sf, total: 2.0 * (sc - sf) / total
     
-    neededColumns = ['Tuu', 'Tdu']
+    neededColumns = ['Tuu', 'Tdu','T']
     newName = "Tsu"
     T.add_column(newName, origin = neededColumns, connection = spinTransmission)
 
-    neededColumns = ['Tdd', 'Tud']
+    neededColumns = ['Tdd', 'Tud','T']
     newName = "Tsd"
     T.add_column(newName, origin = neededColumns, connection = spinTransmission)
+
+    arithmetic_mean = lambda x, y: (x + y) / 2.0
+    neededColumns = ["Tsu", "Tsd"]
+    newName = "Ts"
+    T.add_column(newName, origin = neededColumns, connection = arithmetic_mean)
 
     # do the averaging
     ###########################################################################
@@ -129,9 +142,11 @@ def calculate_spin_transmission(
     # to stay conform with the units we use v_F = 1
     # so D is given in units of v_F * a
     D = ltr / 2.0
+    D = ltr * 2.46e-10 * 1e6 / 2.0
 
     # spin transport
     err = lambda p, x, y: y - spinT(p, x, D, average_N)
+    spinT2 = lambda x, C, LS: spinT([C, LS], x, D, average_N)
     start_parameters = spinT_parameters
 
     # spin up
@@ -148,11 +163,37 @@ def calculate_spin_transmission(
     Cd = final_parameters[0]
     LSd = final_parameters[1]
 
+    try:
+        yvals = O.get_column("Tsu")
+        pars, cov = optimize.curve_fit(spinT2, xvals, yvals, start_parameters)
+        #print pars[0], pars[1] * 0.246, "+-", np.sqrt(cov[1,1])
+        Cu = pars[0]
+        LSu = pars[1]
+        #print cov
+        errorLSu = np.sqrt(cov[1,1])
+
+        yvals = O.get_column("Tsd")
+        pars, cov = optimize.curve_fit(spinT2, xvals, yvals, start_parameters)
+        #print pars[0], pars[1] * 0.246, "+-", np.sqrt(cov[1,1])
+        Cd = pars[0]
+        LSd = pars[1]
+        errorLSd = np.sqrt(cov[1,1])
+    except RuntimeError:
+        module_logger.warning("could not fit data")
+        LSu = 1e13
+        errorLSu = 0.0
+        LSd = 1e13
+        errorLSd = 0.0
+        Cu = 2 * D / average_N / LSu
+        Cd = 2 * D / average_N / LSd
+
     # Now the fit parameters of the two spin components are compared
     # If the deviation is larger than 5%, a warning is plotted:
     deviationC = np.abs(Cu / Cd - 1)
     deviationLS = np.abs(LSu / LSd - 1)
-    module_logger.info("deviation between spin up and down channel: %g / %g" % (deviationC, deviationLS))
+    module_logger.info(
+            "deviation between spin up and down channel: %g / %g" 
+            % (deviationC, deviationLS))
     if deviationC > 0.05 or deviationLS > 0.05:
         module_logger.warning("results for spin up and spin differ by" 
                 "DC =  %i %% and DLS = %i %%, respectively" % 
@@ -160,12 +201,23 @@ def calculate_spin_transmission(
 
     C = (Cu + Cd) / 2.0
     LS = (LSu + LSd) / 2.0
+    errorLS = (errorLSu + errorLSd) / 2.0
 
-    # LS is given in units of a, we also calculate tau_s which according 
-    # to our definition of D then is given in a / v_F
-    tauS = LS**2 / D
+    # rescale scattering lengths to nm
+    LS *= 0.246
+    errorLS *= 0.246
+    ltr *= 0.246
 
-    result = (average_N, ltr, D, C, LS, tauS)
+    # LS is given in units of a, after rescaling it to m and with D
+    # in SI units, tauS will be given in seconds
+    # I however do a rescaling with a factor of 1e9, so that it will be given
+    # in nanoseconds which is more convenient for spin relaxation business
+    tauS = (LS * 1e-9)**2 / D * 1e9
+
+    # rescale effective parameters to SI units
+    #D = ltr * 2.46e-10 * 1e6 / 2.0
+
+    result = (average_N, ltr, D, C, LS, tauS, errorLS)
     return result
 
 def calculateFromObject(T, outfileName, colsToAverage = ["_T"], 
