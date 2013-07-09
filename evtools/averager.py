@@ -220,15 +220,85 @@ def calculate_spin_transmission(
     result = (average_N, ltr, D, C, LS, tauS, errorLS)
     return result
 
+
+# specialized function to do all the fancy averaging stuff with the particular
+# goal to get insight into charge transport of a given system
+# returns:
+# - average_N
+# - ltr
+# - D
+###############################################################################
+def calculate_transmission(
+        dataFileName, 
+        columns = ['L', 'T', 'c1']
+        ):
+    # assign some names to interesting values
+    colsToAverage = ["T"]
+    colsToFit = ["T"]
+    xCol = "L"
+
+    # the input data
+    ###########################################################################
+    T = kmm.MultiMap()
+    T.set_column_names(*columns)
+    T.read_file( dataFileName )
+
+    # do the averaging
+    ###########################################################################
+    outfileName = dataFileName.replace(".out",".dat")
+    calculateFromObject(T, outfileName, colsToAverage = colsToAverage,
+        colsToFit = [], xCol = xCol)
+
+    # load the file with the averaged data
+    ###########################################################################
+    O = kmm.MultiMap(outfileName)
+
+    # fetch the number of open channels
+    array_of_Ns = T.get_column("c1")
+    average_N = array_of_Ns.mean()
+    variance_N = np.sqrt(np.mean((array_of_Ns - average_N)**2))
+
+    if not variance_N == 0:
+        module_logger.warning("number of channels not constant")
+
+    
+    # do fitting
+    ###########################################################################
+    xvals = O.get_possible_values(xCol)
+
+    # charge transport for mean-free path and diffusion constant
+    yvals = O.get_column("T")
+    err = lambda p, x, y: y - diffT(p, x, average_N)
+    start_parameters = diffusion_parameters
+
+    final_parameters, success = optimize.leastsq(
+            err, start_parameters, args = (xvals, yvals))
+
+    # l is the RMT-transport length in units of a
+    l = final_parameters[0]
+    # rescaling according to scaling theory gives the transport theory mean
+    # free path, again in units of a
+    ltr = 2 * l / np.pi
+    # the diffusion constant can be calculated as D = v_F * ltr / 2
+    # to stay conform with the units we use v_F = 1
+    # so D is given in units of v_F * a
+    D = ltr / 2.0
+    D = ltr * 2.46e-10 * 1e6 / 2.0
+
+    # rescale scattering lengths to nm
+    ltr *= 0.246
+
+    # rescale effective parameters to SI units
+    #D = ltr * 2.46e-10 * 1e6 / 2.0
+
+    result = (average_N, ltr, D)
+    return result
+
 def calculateFromObject(T, outfileName, colsToAverage = ["_T"], 
                         colsToFit = ["_T"], xCol = "_L", 
                         shapeTransmission = [], 
                         shapeParameters = [], 
                         generalInformation = []):
-                        # war vorher:
-                        #shapeTransmission = [err_diffT], 
-                        #shapeParameters = [diffusion_parameters], 
-                        #generalInformation = ['_c1']):
     O = kmm.MultiMap()  # output data
 
     # output columns are
