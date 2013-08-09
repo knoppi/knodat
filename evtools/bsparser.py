@@ -267,8 +267,23 @@ if __name__ == '__main__':
             print bs.bandgap()
 
         # postprocessing
+        #######################################################################
         for opt,val in opts:
-            module_logger.debug( "%s: %s" % ( opt, val ) )
+            if opt == "--xlim": 
+                module_logger.info("setting xlimits to %s" % val)
+                xlimits = val.split( ":" )
+                plt.xlim( float( xlimits[0] ), float( xlimits[1] ) )
+            if opt == "--ylim": 
+                module_logger.info("setting ylimits to %s" % val)
+                ylimits = val.split(":")
+                plt.ylim(float( ylimits[0]), float(ylimits[1]))
+            if opt == "--title":
+                logging.info("setting title to %s" % val)
+                plt.title(val)
+        
+        # postprocessing, a second step
+        #######################################################################
+        for opt,val in opts:
             if opt == "--pdf":
                 module_logger.info("saving to pdf")
                 outfileName = dataFileName.replace(".dat",".pdf")
@@ -281,17 +296,6 @@ if __name__ == '__main__':
                 module_logger.info("saving to png")
                 outfileName = dataFileName.replace(".dat",".png")
                 plt.savefig(outfileName)
-            if opt == "--xlim": 
-                module_logger.info("setting xlimits to %s" % val)
-                xlimits = vals.split( ":" )
-                plt.xlim( float( xlimits[0] ), float( xlimits[1] ) )
-            if opt == "--ylim": 
-                module_logger.info("setting ylimits to %s" % vals)
-                ylimits = vals.split(":")
-                plt.ylim(float( ylimits[0]), float(ylimits[1]))
-            if opt == "--title":
-                logging.info("setting title to %s" % val)
-                plt.title(val)
 
         plt.show()
     
