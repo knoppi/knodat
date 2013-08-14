@@ -230,7 +230,7 @@ if __name__ == '__main__':
         opts, args = getopt.getopt(sys.argv[1:], 'g', 
                                    ['eps','pdf','png','xlim=','ylim=','title=',
                                     'color=','fmt=', "debug", "info", "help",
-                                    "gaps"])
+                                    "gaps", "rescalex=", "rescaley="])
         if len(args) > 0 : dataFileName = args[0]
         else : dataFileName = "transmission.out"
 
@@ -257,6 +257,11 @@ if __name__ == '__main__':
 
             if opt == "--gaps" or opt == "-g":
                 calculate_gaps = True
+
+            if opt == "--rescalex":
+                plotting_options["xscaling"] = float(val)
+            if opt == "--rescaley":
+                plotting_options["yscaling"] = float(val)
 
 
         bs = BSParser()
