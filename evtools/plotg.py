@@ -182,6 +182,7 @@ def plotg(dataFileName, **opts):
     save_png = False
     show_colorbar = False
     show_grid = False
+    strip_graph = False
 
     # the default column, note that col-numbering is
     # 0 1 2 ...
@@ -280,6 +281,9 @@ def plotg(dataFileName, **opts):
         if opt == "-g" or opt == "--grid":
             show_grid = True
 
+        if opt == "-s" or opt == "--strip":
+            strip_graph = True
+
         if opt == "--noaspect":
             #del plot_options["extent"]
             plot_options["aspect"] = "auto"
@@ -321,6 +325,14 @@ def plotg(dataFileName, **opts):
 
     ax = plt.gca()
     fig = plt.gcf()
+
+    if strip_graph is True:
+        ax.set_xticks(())
+        ax.set_yticks([])
+        #labels = ax.get_xticklabels()
+        #for label in labels:
+            #label.set_visible = 
+
     
     if show_colorbar is True:
         trans = ax.transAxes
@@ -403,16 +415,17 @@ def usage():
         --levels LEVELS         use the colon-separated LEVELS for the contour plot
     -i, --incomplete            indicates that not every grid-points contains data, so a
                                 slower method has to be used to retrieve the data
+    -s, --strip                 strip graph from all labels
     """)
 
 if __name__ == "__main__":
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'c:m:z:bN:glhnx:y:i', 
+        opts, args = getopt.getopt(sys.argv[1:], 'c:m:z:bN:glhnx:y:is', 
                                    ['eps','pdf','png','xlim=','ylim=','title=',
                                        'interpolation=', 'grid', "logarithmic",
                                        "help", "noaspect",'bilogarithmic=',
                                        "contour", "levels=", "debug",
-                                       "xcol=","ycol=","incomplete"])
+                                       "xcol=","ycol=","incomplete", "strip"])
 
         if ("--help", '') in opts:
             raise getopt.GetoptError("")
@@ -423,9 +436,9 @@ if __name__ == "__main__":
         if len(args) > 0 : dataFileName = args[0]
         else : dataFileName = "scalars.out"
 
-        fig = plt.figure(figsize=(20,5))
+        fig = plt.figure()
         #ax = fig.add_subplot(111, frame_on = False)
-        ax = fig.add_subplot(111)
+        ax = plt.gca()
 
         #ax.xaxis.set_major_locator(mticker.NullLocator())
         #ax.yaxis.set_major_locator(mticker.NullLocator())
