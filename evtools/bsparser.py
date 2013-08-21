@@ -71,14 +71,18 @@ class BSParser:
         self.bs.read_file(_filename)
 
     def plot(self, color = None, fmt = "", xscaling = 1.0, yscaling = 1.0, 
-            markersize = 4.0):
-        kvals = xscaling * self.bs.get_column( '_k' )
+            markersize = 4.0, ymin = -100, ymax = 100, shiftx = 0.0, shifty = 0.0):
+        self.bs.sort('_k')
+        kvals = xscaling * self.bs.get_column( '_k' ) + shiftx
 
         line = ""
         for iband,band in self.bands.items():
-            Evals = yscaling * self.bs.get_column(band)
-            if color == None: line, = plt.plot(kvals, Evals, fmt)
-            else: line, = plt.plot( kvals, Evals, color = color )
+            y = yscaling * self.bs.get_column(band)
+
+            Evals= np.array([x if (x >= ymin and x <= ymax) else np.nan for x in y]) + shifty
+
+            if color == None: line, = plt.plot(kvals, Evals, fmt, clip_on = True)
+            else: line, = plt.plot(kvals, Evals, color = color, clip_on = True)
             line.set_markersize(markersize)
 
     def mark( self, index ):
