@@ -358,7 +358,7 @@ class MultiMap:
     section_write_access = True
 
     def add_column(self, new_name, dataType = "|f8", 
-                   origin = [], connection = None):
+                   origin = [], connection = None, args = ()):
         '''adds a new column called "name" with is either just
            zero or is constructed out of the columns listed in
            origin, connected by some function "connection"'''
@@ -368,11 +368,19 @@ class MultiMap:
         if connection == None:
             newCol = np.zeros((self.data.size,))
         else:
+            # create an two-dimensional array to store the function parameters
             arguments = []
+
+            # the array shall contain the origin columns
             for colname in origin:
                 arguments.append(self.data[:][colname])
+
+            # additionally it shall contain the scalar values from args
+            for value in args:
+                arguments.append(value)
+
+            # now calculate the new column
             newCol = connection(*arguments)
-            newCol = newCol
 
         module_logger.info("new column: %s" % newCol)
 

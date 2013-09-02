@@ -266,6 +266,11 @@ if __name__ == '__main__':
                 plotting_options["xscaling"] = float(val)
             if opt == "--rescaley":
                 plotting_options["yscaling"] = float(val)
+            if opt == "--ylim": 
+                module_logger.info("setting ylimits to %s" % val)
+                ylimits = val.split(":")
+                plotting_options["ymin"] = float(ylimits[0])
+                plotting_options["ymax"] = float(ylimits[1])
 
 
         bs = BSParser()
