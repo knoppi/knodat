@@ -437,6 +437,36 @@ class MultiMap:
         except:
             raise
 
+    def average(self, columns_to_keep, columns_to_average):
+        """ Effectively this method throws away a lot of data """
+        columns_of_new_object = columns_to_keep[:]
+        columns_of_new_object.extend(columns_to_average)
+        temp_multimap = MultiMap(_cols = columns_of_new_object)
+
+
+        restriction_catalogue = [[]]
+
+        for abscissa in columns_to_keep:
+            possible_values = self.get_possible_values(abscissa)
+            restriction_catalogue = [row + [(abscissa, x)] for x in possible_values for row in restriction_catalogue]
+
+        # turn restriction_catalogue into an array of dicts
+        restriction_catalogue = [dict(x) for x in restriction_catalogue]
+
+        for restriction in restriction_catalogue:
+            t = self.get_subset(restriction)
+
+            if t.shape[0] > 0:
+                new_row = []
+
+                for col in columns_to_keep:
+                    new_row.append(restriction[col])
+                for col in columns_to_average:
+                    new_row.append(t[col].mean())
+                temp_multimap.append_row(new_row)
+
+        self = temp_multimap
+
     # section for interactions with the filesystem
     ###########################################################################
     section_filesystem_interactions = True
@@ -1044,3 +1074,4 @@ if __name__ == "__main__":
     module_logger.info("calling non-existent key %s yields: %s" % (3.0, test_object[3.0]))
     module_logger.info("calling non-existent key %s yields: %s" % (1.0, test_object[1.0]))
 
+    test_object.average(["a", "c"], ["d", "e"])
