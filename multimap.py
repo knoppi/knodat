@@ -465,7 +465,8 @@ class MultiMap:
                     new_row.append(t[col].mean())
                 temp_multimap.append_row(new_row)
 
-        self = temp_multimap
+        self.data = temp_multimap.data
+        self.dataType = temp_multimap.dataType
 
     # section for interactions with the filesystem
     ###########################################################################
