@@ -433,7 +433,7 @@ class MultiMap:
     def multiply_column(self, col, factor):
         """ modifies column by multiplying it with factor """
         try:
-            self.data[:,col] = self.data.column[:,col] * factor
+            self.data[col] *= factor
         except:
             raise
 
