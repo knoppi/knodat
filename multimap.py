@@ -439,22 +439,40 @@ class MultiMap:
 
     def average(self, columns_to_keep, columns_to_average):
         """ Effectively this method throws away a lot of data """
+        # We do the averaging by creating a new ndarray.
+        # The columns of the new array will be named. The names will be..
+
+        # ... the "columns_to_keep" as sort of x-values
         columns_of_new_object = columns_to_keep[:]
-        columns_of_new_object.extend(columns_to_average)
+
+        # ... the averaged columns, as well as their sem and rms
+        for column in columns_to_average:
+            columns_of_new_object.append(column)
+            columns_of_new_object.append("error%s" % column)
+            columns_of_new_object.append("rms%s" % column)
+
+        # an extra column for the ensemble_size
+        columns_of_new_object.append("ensemble_size")
+
+        # With the columns defiend create the new multimap object
         temp_multimap = MultiMap(_cols = columns_of_new_object)
 
-
+        # A somehow complicated procedure for finding the correct rows
         restriction_catalogue = [[]]
 
         for abscissa in columns_to_keep:
             possible_values = self.get_possible_values(abscissa)
-            restriction_catalogue = [row + [(abscissa, x)] for x in possible_values for row in restriction_catalogue]
+            restriction_catalogue = [
+                    row + [(abscissa, x)] 
+                    for x in possible_values 
+                    for row in restriction_catalogue]
 
         # turn restriction_catalogue into an array of dicts
         restriction_catalogue = [dict(x) for x in restriction_catalogue]
 
         for restriction in restriction_catalogue:
             t = self.get_subset(restriction)
+            ensemble_size = t.shape[0]
 
             if t.shape[0] > 0:
                 new_row = []
@@ -462,7 +480,13 @@ class MultiMap:
                 for col in columns_to_keep:
                     new_row.append(restriction[col])
                 for col in columns_to_average:
-                    new_row.append(t[col].mean())
+                    average = t[col].mean()
+                    std = t[col].std()
+                    new_row.append(average)
+                    new_row.append(std / np.sqrt(ensemble_size))
+                    new_row.append(np.sqrt(np.mean((t[col] - average)**2)))
+
+                new_row.append(ensemble_size)
                 temp_multimap.append_row(new_row)
 
         self.data = temp_multimap.data
