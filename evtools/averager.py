@@ -8,7 +8,6 @@ import logging
 from scipy import *
 from scipy import optimize
 import numpy as np
-from scipy.stats import sem
 
 import knodat.multimap as kmm
 

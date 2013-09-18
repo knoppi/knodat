@@ -6,7 +6,6 @@
 
 import numpy as np
 import scipy.signal as ssignal
-import matplotlib.pyplot as plt
 import logging
 
 # I set the logging to both logging to std out and to a file with
@@ -144,7 +143,7 @@ class MultiMap:
         if "dType" in options.keys():
             standardType = options["dType"]
         else:
-            standardType = "|f8"
+            standardType = np.float64
 
         for i in keyw:
             new_data_type.append((i, standardType))
@@ -277,9 +276,9 @@ class MultiMap:
                 raise
             i += 1
 
-        if deletion: 
-            module_logger.debug("deletion!")
-            self.data = np.delete(self.data, indices, 0)
+        if deletion == True: 
+            module_logger.warning("deletion!")
+            self.data = np.delete(self.data, indices)
         return result[:]
 
     def get_minimum_value(self, column, absolute = False):
@@ -437,6 +436,27 @@ class MultiMap:
         except:
             raise
 
+    def reduce(self, *columns_to_drop):
+        columns_to_keep = []
+        for col in self.columns:
+            if col in columns_to_drop:
+                continue
+            else:
+                columns_to_keep.append(col)
+
+        sorting_order = columns_to_keep[:]
+        sorting_order.extend(columns_to_drop)
+
+        self.sort(sorting_order)
+
+        key_indices = np.ones(self.data.shape)
+
+        for drop in columns_to_drop:
+            value = self.get_possible_values(drop)[0]
+            key_indices *= np.where(self.data[drop] == value, True, False)
+
+        print self.data[np.where(key_indices == True)]
+        
     def average(self, columns_to_keep, columns_to_average):
         """ Effectively this method throws away a lot of data """
         # We do the averaging by creating a new ndarray.
@@ -467,6 +487,8 @@ class MultiMap:
                     for x in possible_values 
                     for row in restriction_catalogue]
 
+        module_logger.debug("averager: restrictions prepared")
+
         # turn restriction_catalogue into an array of dicts
         restriction_catalogue = [dict(x) for x in restriction_catalogue]
 
@@ -480,7 +502,7 @@ class MultiMap:
                 for col in columns_to_keep:
                     new_row.append(restriction[col])
                 for col in columns_to_average:
-                    average = t[col].mean()
+                    average = t[col].mean(dtype=np.float64)
                     std = t[col].std()
                     new_row.append(average)
                     new_row.append(std / np.sqrt(ensemble_size))
@@ -761,6 +783,17 @@ class MultiMap:
             module_logger.debug(g)
             #xvals = ssignal.convolve(xvals, g, 'same')
             yvals = ssignal.convolve(yvals, g, 'same')
+
+            xvals = xvals[N:-N]
+            yvals = yvals[N:-N]
+            try:
+                xerrs = xerrs[N:-N]
+            except TypeError:
+                pass
+            try:
+                yerrs = yerrs[N:-N]
+            except TypeError:
+                pass
 
  
         if errx == None and erry == None:
