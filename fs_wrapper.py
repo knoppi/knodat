@@ -1,9 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python27
 # -*- coding: utf-8 -*-
 
 import os
 import re
 import logging
+import collections
 
 module_logger = logging.getLogger("FS Wrapper")
 formatting = logging.Formatter(
@@ -64,7 +65,7 @@ def extract_parameters_from_filename(filename, tail = 2, orientation = True):
     tmp = filename.split("/")[-1]
 
     information = tmp.split( "_" )
-    results = {}
+    results = collections.OrderedDict()
     index_correction_due_to_orientation = 1
     if orientation == True:
         results["orientation"] = information[0][:]

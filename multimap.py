@@ -652,34 +652,23 @@ class MultiMap:
             in the data file after each isoline which can be achieved by this
             method
         """
-        self.sort(np.str(_x))
-        self.sort(np.str(_y))
-        
         outfile = open(_filename, 'w')
+        
+        xcol = np.str(_x)
+        ycol = np.str(_y)
 
-        # head line containing the description of the file, i.e. the
-        # dolumn names
-        column_names = ' '.join( ["%s" % k for k in self.columns])
-        line = "".join((self.commentIndicators[0], self.commentIndicators[0], 
-                        " ", column_names, "\n"))
-        outfile.write( line )
-
-        # write data line by line and check if x has been increased
-        current_x = self.data[0][_x]
-        for iline in range( self.data.shape[0] ):
-            current_line = self.data[iline]
-
-            if not current_line[_x] == current_x:
+        xy_columns = [ycol, xcol]
+        self.sort(xy_columns)
+        
+        lastx = self.data[0][xcol]
+        for row in self.data:
+            if row[xcol] < lastx:
+                print ""
                 outfile.write("\n")
-                current_x = current_line[_x]
-
-            line = ""
-            for x in current_line:
-                line += np.str_( x ) + " "
-            line = line+"\n"
-            outfile.write( line )
-
-        module_logger.debug("finished writing file in gnuplot style")
+            print " ".join([np.str(x) for x in row])
+            outfile.write(" ".join([np.str(x) for x in row]))
+            outfile.write("\n")
+            lastx = row[xcol]
 
     #def read_file_numpy_style(self, filename):
         #'''loads content into the MultiMap which was formerly saved as a
