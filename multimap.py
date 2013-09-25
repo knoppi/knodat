@@ -356,7 +356,7 @@ class MultiMap:
     ###########################################################################
     section_write_access = True
 
-    def add_column(self, new_name, dataType = "|f8", 
+    def add_column(self, new_name, dataType = np.float64, 
                    origin = [], connection = None, args = ()):
         '''adds a new column called "name" with is either just
            zero or is constructed out of the columns listed in
@@ -393,6 +393,17 @@ class MultiMap:
 
         self.dataType = new_datatype
         self.columns.append(new_name)
+
+    def remove_column(self, name_of_column):
+        new_datatype = [x for x in self.dataType if x[0] is not name_of_column]
+
+        tmp = np.empty(self.data.shape, dtype = new_datatype)
+        for name in tmp.dtype.names:
+            tmp[name] = self.data[name]
+
+        self.data = tmp
+        self.dataType = new_datatype
+        self.columns = list(self.data.dtype.names)
 
     def append_row(self, row):
         """row is some iterable object which somehow has to fit to dtype"""
@@ -436,26 +447,57 @@ class MultiMap:
         except:
             raise
 
-    def reduce(self, *columns_to_drop):
-        columns_to_keep = []
-        for col in self.columns:
-            if col in columns_to_drop:
-                continue
-            else:
-                columns_to_keep.append(col)
+    def reduce(self, columns_to_drop = [], static = [], statistics = True):
+        reference_values = dict()
+        for drop in columns_to_drop:
+            reference_values[drop] = self.get_possible_values(drop)[0]
 
-        sorting_order = columns_to_keep[:]
+        sorting_order = static[:]
         sorting_order.extend(columns_to_drop)
-
         self.sort(sorting_order)
+
+        columns_of_new_object = static[:]
+        averaging_cols = []
+        for col in self.columns:
+            if col not in sorting_order:
+                averaging_cols.append(col)
+                columns_of_new_object.append(col)
+                if statistics == True:
+                    columns_of_new_object.append("error%s" % col)
+                    columns_of_new_object.append("rms%s" % col)
+
+        if statistics == True:
+            columns_of_new_object.append("ensemble_size")
+
+        new_object = MultiMap(_cols = columns_of_new_object)
 
         key_indices = np.ones(self.data.shape)
 
         for drop in columns_to_drop:
-            value = self.get_possible_values(drop)[0]
-            key_indices *= np.where(self.data[drop] == value, True, False)
+            key_indices *= np.where(self.data[drop] == reference_values[drop], True, False)
 
-        print self.data[np.where(key_indices == True)]
+        key_indices = np.where(key_indices == True)[0]
+        for idx, i in enumerate(key_indices[1:]):
+            new_row = []
+            ensemble_size = i - key_indices[idx]
+            for static_col in static:
+                new_row.append(self.data[key_indices[idx]:i][static_col][0])
+            for averaged_col in averaging_cols:
+                average = self.data[key_indices[idx]:i][averaged_col].mean(dtype=np.float64)
+                new_row.append(average)
+                if statistics == True:
+                    std = self.data[key_indices[idx]:i][averaged_col].std()
+                    variance = np.sqrt(np.mean((self.data[key_indices[idx]:i][averaged_col] - average)**2))
+                    new_row.append(std / np.sqrt(ensemble_size))
+                    new_row.append(variance)
+            if statistics == True:
+                new_row.append(ensemble_size)
+            new_object.append_row(new_row)
+            #print new_row
+        
+        self.data = new_object.data
+        self.dataType = new_object.dataType
+        self.columns = list(self.data.dtype.names)
         
     def average(self, columns_to_keep, columns_to_average):
         """ Effectively this method throws away a lot of data """
