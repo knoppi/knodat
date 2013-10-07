@@ -794,7 +794,7 @@ class MultiMap:
         return (x, hist)
 
     def retrieve_2d_plot_data(self, _colx, _coly, errx = None, erry = None, N = 1,
-                              restrictions = {}):
+                              restrictions = {}, trim = True):
         """ TODO has to be rewritten """
         _colx = str(_colx)
         _coly = str(_coly)
@@ -815,16 +815,17 @@ class MultiMap:
             #xvals = ssignal.convolve(xvals, g, 'same')
             yvals = ssignal.convolve(yvals, g, 'same')
 
-            xvals = xvals[N:-N]
-            yvals = yvals[N:-N]
-            try:
-                xerrs = xerrs[N:-N]
-            except TypeError:
-                pass
-            try:
-                yerrs = yerrs[N:-N]
-            except TypeError:
-                pass
+            if trim == True:
+                xvals = xvals[N:-N]
+                yvals = yvals[N:-N]
+                try:
+                    xerrs = xerrs[N:-N]
+                except TypeError:
+                    pass
+                try:
+                    yerrs = yerrs[N:-N]
+                except TypeError:
+                    pass
 
  
         if errx == None and erry == None:
