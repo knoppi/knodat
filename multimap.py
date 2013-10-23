@@ -488,7 +488,7 @@ class MultiMap:
             for static_col in static:
                 new_row.append(self.data[key_indices[idx]:i][static_col][0])
             for averaged_col in averaging_cols:
-                average = self.data[key_indices[idx]:i][averaged_col].mean(dtype=np.float64)
+                average = self.data[key_indices[idx]:i][averaged_col].mean()
                 new_row.append(average)
                 if statistics == True:
                     std = self.data[key_indices[idx]:i][averaged_col].std()
