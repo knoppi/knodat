@@ -282,6 +282,8 @@ class MultiMap:
         return result[:]
 
     def show(self, **restrictions):
+        """ convenience method for showing (and retrieving) data
+        """
         return self.get_subset(restrictions = restrictions)
 
     def get_minimum_value(self, column, absolute = False):
@@ -840,6 +842,14 @@ class MultiMap:
         else:
             return ( xvals, yvals, xerrs, yerrs )
 
+    def plot(self, x, y, fmt = "-", **restrictions):
+        import matplotlib.pyplot as plt
+        xdata, ydata = self.retrieve_2d_plot_data(x, y, restrictions = restrictions)
+
+        plt.plot(xdata, ydata, fmt)
+
+        return xdata, ydata
+
     def retrieve_3d_plot_data(self, _x, _y, _z, N = 2, data_is_complete = True, 
             *args, **kwargs):
         """ returns the needed matrices for creating a matplotlib-like 3d-plot
@@ -884,13 +894,21 @@ class MultiMap:
             # no x-shift, otherwise, it is 0.5
             x1 = 0.0
             if y[1] - y[0] == 1 / np.sqrt(3):
-                x2 = 0.0
-                x3 = 0.5
-                x4 = 0.5
+                x1 = data[0][_x] - x[0]
+                x2 = x1
+                x3 = 0.5 - x1
+                x4 = 0.5 - x1
             else:
-                x2 = 0.5
-                x3 = 0.5
-                x4 = 0.0
+                x1 = data[0][_x] - x[0]
+                x2 = 0.5 - x1
+                x3 = 0.5 - x1
+                x4 = x1
+
+            #x1 = 0.5
+            #x2 = 0
+            #x3 = x2
+            #x4 = x1
+            #print x1, x2, x3, x4
 
             X[0::4] = T[0::4] + x1
             X[1::4] = T[1::4] + x2
@@ -935,8 +953,8 @@ class MultiMap:
 
             #X = X[yoffset::N,xoffset::N]
             #Y = Y[yoffset::N,xoffset::N]
-            Z = Z[yoffset::N,xoffset::N]
-        
+            #Z = Z[yoffset::N,xoffset::N]
+ 
         return (X, Y, Z, extent )
 
     def retrieve_quiver_plot_data( self, _x, _y, _u, _v, N = 5, **kwargs ):
