@@ -281,6 +281,9 @@ class MultiMap:
             self.data = np.delete(self.data, indices)
         return result[:]
 
+    def show(self, **restrictions):
+        return self.get_subset(restrictions = restrictions)
+
     def get_minimum_value(self, column, absolute = False):
         '''finds the element in column with the least (absolute) value'''
         if absolute is True:
