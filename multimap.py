@@ -107,7 +107,7 @@ class MultiMap:
     # methods for modifying and reading out the structure of the multimap
     ###########################################################################
     section_structure = True
-    def describe(self):
+    def describe(self, few_values = 10):
         """ Prints column names and data types, followed by the number of 
             entries. This method is based on the SQL method to decribe
             tables.
@@ -122,10 +122,19 @@ class MultiMap:
 
         for item in self.dataType:
             print ("%20s: %s" % (item[0], item[1]))
-        #print self.dataType.descr
 
         print "MultiMap contains %i entries" % self.length()
         print "MultiMap shape: %s" % (self.data.shape, )
+        
+        for column in self.columns:
+            values = self.get_possible_values(column)
+            if len(values) == 1:
+                print "%s fixed at %s" % (column, values[0])
+            elif len(values) <= few_values:
+                print "%s with %i values: %s" % (column, len(values), values)
+            else:
+                print ("%s with %i values ranging from %s to %s" % 
+                        (column, len(values), values.min(), values.max()))
 
     def length(self):
         return self.data.shape[0]
@@ -453,14 +462,12 @@ class MultiMap:
             raise
 
     def reduce(self, columns_to_drop = [], static = [], statistics = True):
-        reference_values = dict()
-        for drop in columns_to_drop:
-            reference_values[drop] = self.get_possible_values(drop)[0]
-
+        # define the ordering, needed for fast array manipulation
         sorting_order = static[:]
         sorting_order.extend(columns_to_drop)
         self.sort(sorting_order)
 
+        # prepare and create new object
         columns_of_new_object = static[:]
         averaging_cols = []
         for col in self.columns:
@@ -476,12 +483,11 @@ class MultiMap:
 
         new_object = MultiMap(_cols = columns_of_new_object)
 
-        key_indices = np.ones(self.data.shape)
+        # find key indices
+        slowest_axis = self.data[:][static[0]]
+        values_of_slowest_axis = self.get_possible_values(static[0])
+        key_indices = np.searchsorted(slowest_axis, values_of_slowest_axis)
 
-        for drop in columns_to_drop:
-            key_indices *= np.where(self.data[drop] == reference_values[drop], True, False)
-
-        key_indices = np.where(key_indices == True)[0]
         for idx, i in enumerate(key_indices[1:]):
             new_row = []
             ensemble_size = i - key_indices[idx]
@@ -620,10 +626,10 @@ class MultiMap:
     def set_zero(self, value):
         self.zero = value
 
-    def sort( self, column ):
+    def sort(self, column):
         """ sorts the MultiMap along column
         """
-        self.data = np.sort( self.data, order = column )
+        self.data = np.sort(self.data, order = column)
 
     def write_file(self, filename, **options):
         """writes the data to a file called 'filename' in ASCII format """
