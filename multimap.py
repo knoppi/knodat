@@ -461,6 +461,17 @@ class MultiMap:
         except:
             raise
 
+    def rename_column(self, old_column_name, new_column_name):
+        temporary_data_type = self.dataType
+        new_data_type = [(x, y) if x != old_column_name 
+                else (new_column_name, y) 
+                for x, y in temporary_data_type]
+        new_columns = [x for x, y in new_data_type]
+        self.columns = new_columns
+        self.dataType = new_data_type
+        self.data.dtype = new_data_type
+        #self.set_data_type(new_data_type)
+
     def reduce(self, columns_to_drop = [], static = [], statistics = True):
         # define the ordering, needed for fast array manipulation
         sorting_order = static[:]
@@ -487,6 +498,7 @@ class MultiMap:
         slowest_axis = self.data[:][static[0]]
         values_of_slowest_axis = self.get_possible_values(static[0])
         key_indices = np.searchsorted(slowest_axis, values_of_slowest_axis)
+        key_indices.append(-1)
 
         for idx, i in enumerate(key_indices[1:]):
             new_row = []
