@@ -128,13 +128,15 @@ class MultiMap:
         
         for column in self.columns:
             values = self.get_possible_values(column)
+            formatting = "%27s %13s: %s"
             if len(values) == 1:
-                print "%s fixed at %s" % (column, values[0])
-            elif len(values) <= few_values:
-                print "%s with %i values: %s" % (column, len(values), values)
+                print formatting % ("fixed parameter", column, values[0])
+            elif len(values) < 5:
+                print formatting % ("parameter with few values", column, values)
             else:
-                print ("%s with %i values ranging from %s to %s" % 
-                        (column, len(values), values.min(), values.max()))
+                limits = ("%s - %s" % (min(values), max(values)))
+                description = "parameter with %i values" % len(values)
+                print formatting % (description, column, limits)
 
     def length(self):
         return self.data.shape[0]
@@ -498,11 +500,12 @@ class MultiMap:
         slowest_axis = self.data[:][static[0]]
         values_of_slowest_axis = self.get_possible_values(static[0])
         key_indices = np.searchsorted(slowest_axis, values_of_slowest_axis)
-        key_indices.append(-1)
+        key_indices = np.append(key_indices, [self.length()])
 
         for idx, i in enumerate(key_indices[1:]):
             new_row = []
             ensemble_size = i - key_indices[idx]
+            ensemble_size = self.data[key_indices[idx]:i].shape[0]
             for static_col in static:
                 new_row.append(self.data[key_indices[idx]:i][static_col][0])
             for averaged_col in averaging_cols:
