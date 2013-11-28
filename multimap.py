@@ -475,10 +475,25 @@ class MultiMap:
         #self.set_data_type(new_data_type)
 
     def reduce(self, columns_to_drop = [], static = [], statistics = True):
+        def create_ordering_column(*cols):
+            result = np.zeros(self.length(), "|S200")
+            for column in cols:
+                result = np.core.defchararray.add(result, column.astype("|S20"))
+            return result
+
+        self.add_column('__sorting__', dataType = "|S200", origin = static, connection = create_ordering_column)
+
         # define the ordering, needed for fast array manipulation
         sorting_order = static[:]
         sorting_order.extend(columns_to_drop)
-        self.sort(sorting_order)
+        sorting_order.extend(["__sorting__"])
+        self.sort("__sorting__")
+
+        # find key indices
+        fastest_axis = self.data[:]["__sorting__"]
+        values_of_fastest_axis = self.get_possible_values("__sorting__")
+        key_indices = np.searchsorted(fastest_axis, values_of_fastest_axis)
+        key_indices = np.append(key_indices, [self.length()])
 
         # prepare and create new object
         columns_of_new_object = static[:]
@@ -495,12 +510,6 @@ class MultiMap:
             columns_of_new_object.append("ensemble_size")
 
         new_object = MultiMap(_cols = columns_of_new_object)
-
-        # find key indices
-        slowest_axis = self.data[:][static[0]]
-        values_of_slowest_axis = self.get_possible_values(static[0])
-        key_indices = np.searchsorted(slowest_axis, values_of_slowest_axis)
-        key_indices = np.append(key_indices, [self.length()])
 
         for idx, i in enumerate(key_indices[1:]):
             new_row = []
