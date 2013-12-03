@@ -474,7 +474,7 @@ class MultiMap:
         self.data.dtype = new_data_type
         #self.set_data_type(new_data_type)
 
-    def reduce(self, columns_to_drop = [], static = [], statistics = True):
+    def reduce(self, columns_to_drop = [], static = [], statistics = True, method = np.mean):
         # define the ordering, needed for fast array manipulation
         sorting_order = static[:]
         sorting_order.extend(columns_to_drop)
@@ -509,7 +509,7 @@ class MultiMap:
             for static_col in static:
                 new_row.append(self.data[key_indices[idx]:i][static_col][0])
             for averaged_col in averaging_cols:
-                average = self.data[key_indices[idx]:i][averaged_col].mean()
+                average = method(self.data[key_indices[idx]:i][averaged_col])
                 new_row.append(average)
                 if statistics == True:
                     std = self.data[key_indices[idx]:i][averaged_col].std()
