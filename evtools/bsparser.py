@@ -76,6 +76,7 @@ class BSParser:
         kvals = xscaling * self.bs.get_column( '_k' ) + shiftx
 
         line = ""
+        lines = []
         for iband,band in self.bands.items():
             y = yscaling * self.bs.get_column(band)
 
@@ -84,6 +85,9 @@ class BSParser:
             if color == None: line, = plt.plot(kvals, Evals, fmt, clip_on = True)
             else: line, = plt.plot(kvals, Evals, color = color, clip_on = True)
             line.set_markersize(markersize)
+            lines.append(line)
+
+        return lines
 
     def mark( self, index ):
         plt.lines[index-1].set_marker('o')
