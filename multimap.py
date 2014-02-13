@@ -23,9 +23,9 @@ module_logger.setLevel(logging.WARNING)
 
 
 def set_debug_level(level):
-    possible_levels = dict(debug=logging.DEBUG, info=logging.INFO,
-                           warning=logging.WARNING, error=logging.ERROR,
-                           fatal=logging.FATAL)
+    possible_levels = dict(
+        debug=logging.DEBUG, info=logging.INFO, warning=logging.WARNING,
+        error=logging.ERROR, fatal=logging.FATAL)
     ch.setLevel(possible_levels[level])
     module_logger.setLevel(possible_levels[level])
 
@@ -68,7 +68,7 @@ class MultiMap:
         self.columns = []
         self.dataType = []
 
-        if not _cols == None:
+        if not _cols is None:
             self.set_column_names(*_cols)
         if _fileName is not None:
             if _fileName[-4:] == '.npy':
@@ -306,22 +306,6 @@ class MultiMap:
         """
         return self.get_subset(restrictions=restrictions)
 
-    def get_minimum_value(self, column, absolute=False):
-        '''finds the element in column with the least (absolute) value'''
-        if absolute is True:
-            return np.amin(np.abs(self.data[:][column]))
-        else:
-            return np.amin(self.data[:][column])
-
-    def get_x_of_minimum_value(self, x_column, y_column, absolute=False):
-        '''returns value of x_column where (absolute) of y_column has its
-           minimum'''
-        y_value = self.get_minimum_value(y_column, absolute)
-        restriction = {y_column: y_value}
-        x_values = self.get_column_hard_restriction(x_column, **restriction)
-
-        return (x_values, y_value)
-
     def get_column_by_index(
             self, _col_index, _col2_indices=[], _lambda=None,
             _deletion=False):
@@ -420,6 +404,19 @@ class MultiMap:
         self.dataType = new_datatype
         self.columns.append(new_name)
 
+    def remove_columns(self, *names_of_columns):
+        new_datatype = [x
+                        for x in self.dataType
+                        if x[0] not in names_of_columns]
+
+        tmp = np.empty(self.data.shape, dtype=new_datatype)
+        for name in tmp.dtype.names:
+            tmp[name] = self.data[name]
+
+        self.data = tmp
+        self.dataType = new_datatype
+        self.columns = list(self.data.dtype.names)
+
     def remove_column(self, name_of_column):
         new_datatype = [x for x in self.dataType if x[0] is not name_of_column]
 
@@ -484,9 +481,11 @@ class MultiMap:
         self.data.dtype = new_data_type
         # self.set_data_type(new_data_type)
 
-    def reduce(self,
-               columns_to_drop=[], static=[],
+    def reduce(self, columns_to_drop=[], static=[],
                statistics=True, method=np.mean):
+        """ Reduces the total size of the multimap by combining subsets
+            defined by the columns defined in static.
+            """
         def create_ordering_column(*cols):
             result = np.zeros(self.length(), "|S200")
             for column in cols:
@@ -535,13 +534,12 @@ class MultiMap:
                 average = method(self.data[key_indices[idx]:i][averaged_col])
                 new_row.append(average)
                 if statistics is True:
-                    std = self.data[key_indices[idx]:i][averaged_col].std()
-                    variance = np.sqrt(
-                        np.mean(
-                            (self.data[key_indices[idx]:i][averaged_col] - average)**2))
+                    values = self.data[key_indices[idx]:i][averaged_col]
+                    std = values.std()
+                    variance = np.sqrt(np.mean((values - average) ** 2))
                     new_row.append(std / np.sqrt(ensemble_size))
                     new_row.append(variance)
-            if statistics == True:
+            if statistics is True:
                 new_row.append(ensemble_size)
             new_object.append_row(new_row)
             # print new_row
@@ -599,7 +597,7 @@ class MultiMap:
                     std = t[col].std()
                     new_row.append(average)
                     new_row.append(std / np.sqrt(ensemble_size))
-                    new_row.append(np.sqrt(np.mean((t[col] - average)**2)))
+                    new_row.append(np.sqrt(np.mean((t[col] - average) ** 2)))
 
                 new_row.append(ensemble_size)
                 temp_multimap.append_row(new_row)
@@ -619,8 +617,8 @@ class MultiMap:
                 self.separator = val
             if key == "fieldnames":
                 self.set_column_names(val)
-            if key == "skipinitialspaces":
-                skipInitialSpaces = val
+            #if key == "skipinitialspaces":
+                #skipInitialSpaces = val
 
         # now three cases can be thought of:
         # 1) we already know the column names
@@ -689,7 +687,7 @@ class MultiMap:
             for x in self.data[iline]:
                 line += np.str_(x) + " "
                 #line += ( "%.10f " % x )
-            line = line+"\n"
+            line = line + "\n"
             outfile.write(line)
 
         module_logger.debug("finished writing file")
@@ -758,69 +756,9 @@ class MultiMap:
 
         return (x_values, y_value)
 
-    def get_column_by_index(
-            self, _col_index, _col2_indices=[], _lambda=None,
-            _deletion=False):
-        """returns array containing content of _col_index where the
-        columns in _col2_index fulfill the corresponding condition in
-        _lambda _col_index is a single integer, _col2_index is an
-        array of integers, _lambda is a function taking two arguments:
-        the index of the current restriction and the corresponding
-        restriction.  Example:
-        #def restrictions(n, x):
-            #if n == 0: return (x>0)
-            #if n == 1: return (x<0)
-        desired_values = example_multi_map.getColumnGeneral(
-            1, [2,3], restrictions)
-
-        this piece of code fetches all values in column 1, where column
-        2 contains a positive value and column 3 contains a negative value
-        """
-        col_name = self.columns[_col_index]
-        col2_names = []
-        for index in _col2_indices:
-            col2_names.append(self.columns[index])
-        return self.get_column_general(col_name, col2_names, _lambda, _deletion)
-
-    def get_column_general(self, _col_name, _col2_names=[], _lambda=None,
-                           _deletion=False):
-        result = self.data[:]
-        indices = np.array(range(self.data.shape[0]))
-
-        i = 0
-        for rest_name in _col2_names:
-            result = result[np.where(_lambda(i, result[:][rest_name]))]
-            indices = indices[np.where(_lambda(i, result[:][rest_name]))]
-            i += 1
-
-        if _deletion:
-                self.data = np.delete(self.data, indices, 0)
-
-        return result[:][_col_name]
-
-    def get_column_hard_restriction(self, desire, **restrictions):
-        """ gets the content of column desire under hard (==) restrictions
-        Returns an array according to some hard restriction, i.e.
-        requesting column "desire" where all the key of "restrictions"
-        exactly have the value given by the values of "restrictions"
-        """
-        result = self.get_subset(restrictions)
-
-        return result[desire]
-
-    def get_column(self, desire):
-        """ returns column desire without applying any restriction
-        """
-        return self.data[:][desire]
-
-    # methods giving non-trivial read access to data, usually involving some
-    # maths or statistical operations
-    #
-    section_read_access_complex = True
-
     def mean(self, column):
         tmp = self.get_column(column)
-        return self.mean
+        return tmp.mean
 
     def get_possible_values(self, colName, **restrictions):
         """ similar as get_column_general, but duplicates are deleted
@@ -857,9 +795,9 @@ class MultiMap:
         self.sort(_colx)
         xvals = self.get_column_hard_restriction(_colx, **restrictions)
         yvals = self.get_column_hard_restriction(_coly, **restrictions)
-        xerrs = (0 if errx == None else
+        xerrs = (0 if errx is None else
                  self.get_column_hard_restriction(errx, **restrictions))
-        yerrs = (0 if erry == None else
+        yerrs = (0 if erry is None else
                  self.get_column_hard_restriction(erry, **restrictions))
 
         if N > 1:
@@ -868,7 +806,7 @@ class MultiMap:
             #xvals = ssignal.convolve(xvals, g, 'same')
             yvals = ssignal.convolve(yvals, g, 'same')
 
-            if trim == True:
+            if trim is True:
                 xvals = xvals[N:-N]
                 yvals = yvals[N:-N]
                 try:
@@ -880,11 +818,11 @@ class MultiMap:
                 except TypeError:
                     pass
 
-        if errx == None and erry == None:
+        if errx is None and erry is None:
             return (xvals, yvals)
-        elif errx == None and not erry == None:
+        elif errx is None and not erry is None:
             return (xvals, yvals, yerrs)
-        elif not errx == None and erry == None:
+        elif not errx is None and erry is None:
             return (xvals, yvals, xerrs)
         else:
             return (xvals, yvals, xerrs, yerrs)
@@ -970,18 +908,19 @@ class MultiMap:
 
         Z = np.zeros(X.shape)
 
-        if data_is_complete == False:
+        if data_is_complete is False:
             for row in data:
                 xi = 0
                 xi = int(np.where(x == row[_x])[0][0] / 2)
                 yi, = np.where(y == row[_y])[0]
                 Z[yi, xi] = row[_z]
         else:
-            # NOTE missing values rot this reshaping, an additional method for that
-            # case is the one commented out below, but this is by far less fast
-            difference = Y.shape[0]*Y.shape[1] - len(data[:][_z])
+            # NOTE missing values rot this reshaping, an additional method
+            # for that case is the one commented out below, but this is by
+            # far less fast
+            difference = Y.shape[0] * Y.shape[1] - len(data[:][_z])
             module_logger.debug('datapoints %i' % len(data[:][_z]))
-            module_logger.debug('grid size %i' % (Y.shape[0]*Y.shape[1]))
+            module_logger.debug('grid size %i' % (Y.shape[0] * Y.shape[1]))
             module_logger.debug('difference to optimum entry number %i' %
                                 difference)
             if difference > 0:
@@ -992,17 +931,9 @@ class MultiMap:
             module_logger.debug('datapoints %i' % len(data[:][_z]))
             Z = data[:][_z].reshape(Y.shape)
 
-        xoffset = 0
-        yoffset = 0
         if N > 1:
             g = gauss_kern(N)
-            xoffset = (Y.shape[1] % N) / 2
-            yoffset = (Y.shape[0] % N) / 2
             Z = ssignal.convolve(Z, g, 'same')
-
-            #X = X[yoffset::N,xoffset::N]
-            #Y = Y[yoffset::N,xoffset::N]
-            #Z = Z[yoffset::N,xoffset::N]
 
         return (X, Y, Z, extent)
 
@@ -1065,7 +996,7 @@ class MultiMap:
 
         # NOTE missing values rot this reshaping, an additional method for that
         # case is the one commented out below, but this is by far less fast
-        difference = X.shape[0]*X.shape[1] - len(data[:][_u])
+        difference = X.shape[0] * X.shape[1] - len(data[:][_u])
         module_logger.debug('difference to optimum entry number %i' %
                             difference)
         data = np.sort(data, order=[_x, _y])
@@ -1075,11 +1006,9 @@ class MultiMap:
         U = data[:][_u].reshape(Y.shape)
         V = data[:][_v].reshape(Y.shape)
         # if len(data[:][_u]) == X.shape[0]*X.shape[1]:
-            #module_logger.debug("retrieve_quiver_plot_data: using fast reshaping method for the data")
             #U = data[:][_u].reshape(Y.shape)
             #V = data[:][_v].reshape(Y.shape)
         # else:
-            #module_logger.debug("retrieve_quiver_plot_data: using slow element-wise ordering")
             # for row in data:
                 #xi = int(np.where(x == row[_x])[0][0] / 2)
                 #yi, = np.where(y == row[_y])[0]
