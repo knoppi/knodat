@@ -902,6 +902,8 @@ class MultiMap:
             X[3::4] = T[3::4] + x4
         else:
             module_logger.debug('assuming square grid')
+            module_logger.debug("x-shape: %s" % x.shape)
+            module_logger.debug("y-shape: %s" % y.shape)
             X, Y = np.meshgrid(x, y)
 
         extent = (x.min(), x.max(), y.min(), y.max())
