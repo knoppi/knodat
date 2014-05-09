@@ -391,7 +391,7 @@ class MultiMap:
             # now calculate the new column
             newCol = connection(*arguments)
 
-        module_logger.info("new column: %s" % newCol)
+        module_logger.debug("new column: %s" % newCol)
 
         tmp = np.empty(self.data.shape, dtype=new_datatype)
         for name in self.data.dtype.names:
@@ -441,14 +441,6 @@ class MultiMap:
         #module_logger.debug("new row as ndarray is %s" % (new_row,))
         #module_logger.debug("new row as ndarray is %s" % (self.data,))
 
-        # TODO Do this with functional programming
-        try:
-            self.set_x_column(self.x_column_name)
-        except AttributeError, e:
-            module_logger.info(e)
-        except:
-            raise
-
     def append_data(self, other):
         """ concatenate MultiMap with a second one """
         try:
@@ -486,6 +478,10 @@ class MultiMap:
         """ Reduces the total size of the multimap by combining subsets
             defined by the columns defined in static.
             """
+        module_logger.info("reduction")
+        module_logger.info("... columns to drop: %s" % (columns_to_drop,))
+        module_logger.info("... static columns: %s" % (static,))
+
         def create_ordering_column(*cols):
             result = np.zeros(self.length(), "|S200")
             for column in cols:
@@ -495,6 +491,8 @@ class MultiMap:
 
         self.add_column('__sorting__', dataType="|S200",
                         origin=static, connection=create_ordering_column)
+
+        module_logger.info("... added sorting column")
 
         # define the ordering, needed for fast array manipulation
         sorting_order = static[:]
@@ -524,6 +522,26 @@ class MultiMap:
 
         new_object = MultiMap(_cols=columns_of_new_object)
 
+        # here the actual reduction begins
+        module_logger.info(
+                "... start with the actual reduction with %i key indices" % 
+                key_indices.shape[0])
+
+        import sys
+        import itertools
+
+        progressbar_width = 80
+
+        # setup progressbar
+        sys.stdout.write("[%s]" % (" " * progressbar_width))
+        sys.stdout.flush()
+        sys.stdout.write("\b" * (progressbar_width + 1))
+
+        symbols = itertools.cycle(r"|/-\\")
+
+        pb_indices = (key_indices[::int(len(key_indices) / progressbar_width)])[-progressbar_width + 1:]
+        pb_indices.append(key_indices[-1])
+
         for idx, i in enumerate(key_indices[1:]):
             new_row = []
             ensemble_size = i - key_indices[idx]
@@ -542,7 +560,15 @@ class MultiMap:
             if statistics is True:
                 new_row.append(ensemble_size)
             new_object.append_row(new_row)
-            # print new_row
+
+            if i in pb_indices:
+                sys.stdout.write("-")
+                sys.stdout.flush()
+            else:
+                sys.stdout.write(symbols.next())
+                sys.stdout.write("\b")
+                sys.stdout.flush()
+
 
         self.data = new_object.data
         self.dataType = new_object.dataType
