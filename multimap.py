@@ -4,6 +4,9 @@
 # developers notes:
 # - http://packages.python.org/joblib/memory.html might speed up
 
+import sys
+import itertools
+
 import numpy as np
 import scipy.signal as ssignal
 import logging
@@ -20,7 +23,6 @@ ch.setLevel(logging.WARNING)
 
 module_logger.addHandler(ch)
 module_logger.setLevel(logging.WARNING)
-
 
 def set_debug_level(level):
     possible_levels = dict(
@@ -51,6 +53,39 @@ def gauss_kern_1d(size):
     x = np.arange(-size, size + 1, 1)
     g = np.exp(-(x ** 2 / float(size)))
     return g / g.sum()
+
+
+def create_ordering_column(*cols):
+    result = np.zeros(cols[0].shape[0], "|S200")
+    for column in cols:
+        result = np.core.defchararray.add(
+            result, column.astype("|S20"))
+    return result
+
+
+def reduce_subset(current_subset, static, averaging_cols, statistics, method):
+    import numpy as np
+
+    new_row = []
+    ensemble_size = current_subset.shape[0]
+    for static_col in static:
+        new_row.append(current_subset[static_col][0])
+    for averaged_col in averaging_cols:
+        if statistics is True:
+            average = method(current_subset[averaged_col])
+            values = current_subset[averaged_col]
+            std = values.std()
+            variance = np.sqrt(np.mean((values - average) ** 2))
+            new_row.append(average)
+            new_row.append(std / np.sqrt(ensemble_size))
+            new_row.append(variance)
+        else:
+            average = method(current_subset[averaged_col])
+            new_row.append(average)
+    if statistics is True:
+        new_row.append(ensemble_size)
+
+    return new_row
 
 
 class MultiMap:
@@ -266,40 +301,39 @@ class MultiMap:
     def get_subset(self, restrictions={}, deletion=False):
         """ returns a subset of data with hard restrictions
         """
-        module_logger.debug('get_subset: restrictions: %s' % (restrictions,))
-        restriction_lhs = []
-        restriction_rhs = []
-        for key in restrictions:
-            restriction_lhs.append(key)
-            restriction_rhs.append(restrictions[key])
+        # We define two functions for comparison of the restrictions
+        # with our data. 
+        # hard_restriction requires an exact agreement and is suitable
+        # for exact data as strings
+        # soft_restriction checks for agreement within a given tolerance
+        # self.zero and is used by default; hard restriction is merely a
+        # fallback mechanism
+        R = restrictions.items()
+        soft_restriction = lambda n, x: np.abs(x - R[n][1]) < self.zero
+        hard_restriction = lambda n, x: (x == R[n][1])
 
-        _lambda = lambda n, x: np.abs(x - restriction_rhs[n]) < self.zero
-        _lambda_general = lambda n, x: (x == restriction_rhs[n])
-
+        # data to return
         result = self.data[:]
-
         indices = np.array(range(self.data.shape[0]))
 
-        i = 0
-        for rest_name in restriction_lhs:
+        # reduce the result by applying restrictions
+        for idx in range(len(R)):
             try:
-                result = result[np.where(_lambda(i, result[:][rest_name]))]
-                indices = indices[
-                    np.where(_lambda(i, result[:][rest_name]))]
+                subset = np.where(soft_restriction(idx, result[:][R[idx][0]]))
+                result = result[subset]
+                indices = indices[subset]
             except TypeError:
                 # most probably the variable is no float
-                result = result[
-                    np.where(_lambda_general(i, result[:][rest_name]))]
-                indices = indices[
-                    np.where(_lambda_general(i, result[:][rest_name]))]
+                subset = np.where(hard_restriction(idx, result[:][R[idx][0]]))
+                result = result[subset]
+                indices = indices[subset]
             except:
                 raise
-            i += 1
 
         if deletion is True:
-            module_logger.warning("deletion!")
             self.data = np.delete(self.data, indices)
-        return result[:]
+
+        return result
 
     def show(self, **restrictions):
         """ convenience method for showing (and retrieving) data
@@ -391,7 +425,7 @@ class MultiMap:
             # now calculate the new column
             newCol = connection(*arguments)
 
-        module_logger.debug("new column: %s" % newCol)
+        module_logger.debug("new column %s: %s" % (new_name, newCol))
 
         tmp = np.empty(self.data.shape, dtype=new_datatype)
         for name in self.data.dtype.names:
@@ -477,22 +511,15 @@ class MultiMap:
                statistics=True, method=np.mean):
         """ Reduces the total size of the multimap by combining subsets
             defined by the columns defined in static.
-            """
-        module_logger.info("reduction")
-        module_logger.info("... columns to drop: %s" % (columns_to_drop,))
-        module_logger.info("... static columns: %s" % (static,))
-
-        def create_ordering_column(*cols):
-            result = np.zeros(self.length(), "|S200")
-            for column in cols:
-                result = np.core.defchararray.add(
-                    result, column.astype("|S20"))
-            return result
+        """
+        print "performing reduction"
+        print "    columns to drop: %s" % (columns_to_drop,)
+        print "    static columns: %s" % (static,)
 
         self.add_column('__sorting__', dataType="|S200",
                         origin=static, connection=create_ordering_column)
 
-        module_logger.info("... added sorting column")
+        module_logger.debug("... added sorting column")
 
         # define the ordering, needed for fast array manipulation
         sorting_order = static[:]
@@ -500,7 +527,7 @@ class MultiMap:
         sorting_order.extend(["__sorting__"])
         self.sort("__sorting__")
 
-        # find key indices
+        # find key indices where __sorting__ assumes a new value
         fastest_axis = self.data[:]["__sorting__"]
         values_of_fastest_axis = self.get_possible_values("__sorting__")
         key_indices = np.searchsorted(fastest_axis, values_of_fastest_axis)
@@ -520,45 +547,40 @@ class MultiMap:
         if statistics is True:
             columns_of_new_object.append("ensemble_size")
 
-        new_object = MultiMap(_cols=columns_of_new_object)
-
         # here the actual reduction begins
         module_logger.info(
                 "... start with the actual reduction with %i key indices" % 
                 key_indices.shape[0])
 
-        import sys
-        import itertools
+        self.reduction_single_core(static, averaging_cols, columns_of_new_object, key_indices, method, statistics)
+        #self.reduction_distributed_dispy(static, averaging_cols, columns_of_new_object, key_indices, method, statistics)
 
-        progressbar_width = 80
+    def reduction_single_core(self, static, averaging_cols, columns_of_new_object, key_indices, method, statistics):
+        import time
 
         # setup progressbar
+        symbols = itertools.cycle(r"|/-\\")
+        progressbar_width = 80
+        
+        try:
+            pb_step = int(len(key_indices) / progressbar_width)
+            pb_indices = list((key_indices[::pb_step])[-progressbar_width + 1:])
+            pb_indices.append(key_indices[-1])
+        except ValueError:
+            progressbar_width = len(key_indices) - 1
+            pb_indices = key_indices
+        pb_indices2 = []
+        
         sys.stdout.write("[%s]" % (" " * progressbar_width))
         sys.stdout.flush()
         sys.stdout.write("\b" * (progressbar_width + 1))
 
-        symbols = itertools.cycle(r"|/-\\")
-
-        pb_indices = (key_indices[::int(len(key_indices) / progressbar_width)])[-progressbar_width + 1:]
-        pb_indices.append(key_indices[-1])
-
+        start = time.clock()
+        new_object = MultiMap(_cols=columns_of_new_object)
         for idx, i in enumerate(key_indices[1:]):
-            new_row = []
-            ensemble_size = i - key_indices[idx]
-            ensemble_size = self.data[key_indices[idx]:i].shape[0]
-            for static_col in static:
-                new_row.append(self.data[key_indices[idx]:i][static_col][0])
-            for averaged_col in averaging_cols:
-                average = method(self.data[key_indices[idx]:i][averaged_col])
-                new_row.append(average)
-                if statistics is True:
-                    values = self.data[key_indices[idx]:i][averaged_col]
-                    std = values.std()
-                    variance = np.sqrt(np.mean((values - average) ** 2))
-                    new_row.append(std / np.sqrt(ensemble_size))
-                    new_row.append(variance)
-            if statistics is True:
-                new_row.append(ensemble_size)
+            current_subset = self.data[key_indices[idx]:i]
+
+            new_row = reduce_subset(current_subset[:], static, averaging_cols, statistics, method)
             new_object.append_row(new_row)
 
             if i in pb_indices:
@@ -568,7 +590,79 @@ class MultiMap:
                 sys.stdout.write(symbols.next())
                 sys.stdout.write("\b")
                 sys.stdout.flush()
+        sys.stdout.write("\n")
 
+        end = time.clock()
+        print end - start
+
+        self.data = new_object.data
+        self.dataType = new_object.dataType
+        self.columns = list(self.data.dtype.names)
+
+    def reduction_distributed_dispy(self, static, averaging_cols, columns_of_new_object, key_indices, method, statistics):
+        import dispy
+        import time
+
+        # setup progressbar
+        symbols = itertools.cycle(r"|/-\\")
+        progressbar_width = 80
+
+        try:
+            pb_step = int(len(key_indices) / progressbar_width)
+            pb_indices = list((key_indices[::pb_step])[-progressbar_width + 1:])
+            pb_indices.append(key_indices[-1])
+        except ValueError:
+            progressbar_width = len(key_indices)
+            pb_indices = range(progressbar_width)
+        pb_indices2 = []
+        
+        cluster = dispy.JobCluster(reduce_subset)
+        jobs = []
+
+        sys.stdout.write("submitting: [%s]" % (" " * progressbar_width))
+        sys.stdout.flush()
+        sys.stdout.write("\b" * (progressbar_width + 1))
+
+        start = time.clock()
+        for idx, i in enumerate(key_indices[1:]):
+            current_subset = self.data[key_indices[idx]:i][:]
+
+            job = cluster.submit(current_subset, static, averaging_cols, statistics, method)
+            jobs.append(job)
+
+            if i in pb_indices:
+                sys.stdout.write("-")
+                sys.stdout.flush()
+                pb_indices2.append(idx)
+            else:
+                sys.stdout.write(symbols.next())
+                sys.stdout.write("\b")
+                sys.stdout.flush()
+
+        sys.stdout.write("\n")
+        sys.stdout.write("collecting: [%s]" % (" " * progressbar_width))
+        sys.stdout.flush()
+        sys.stdout.write("\b" * (progressbar_width + 1))
+        
+        new_object = MultiMap(_cols=columns_of_new_object)
+        for idx, job in enumerate(jobs):
+            new_row = job()
+            new_object.append_row(new_row)
+            
+            if idx in pb_indices2:
+                sys.stdout.write("-")
+                sys.stdout.flush()
+            else:
+                sys.stdout.write(symbols.next())
+                sys.stdout.write("\b")
+                sys.stdout.flush()
+
+
+        sys.stdout.write("\n")
+        cluster.stats()
+        
+        end = time.clock()
+        print end - start
 
         self.data = new_object.data
         self.dataType = new_object.dataType
@@ -1062,107 +1156,30 @@ class MultiMap:
 
         return (X, Y, U, V, extent)
 
-    # Old functions kept due to backwards comapbility; will give a warning
-    # about deprecation
+    # Old functions with camelCase-naming, deleted on 2014-05-13
     #
-    section_old = True
-
-    def setColumnNames(self, *keyw, **options):
-        '''Deprecated; use set_column_names instead'''
-        module_logger.warning("using deprecated function setColumnNames!")
-        self.set_column_names(*keyw, **options)
-
-    def setDataType(self, new_dataType):
-        '''Deprecated; use set_data_type instead'''
-        module_logger.warning("using deprecated function setDataType!")
-        self.set_data_type(new_dataType)
-
-    def readFile(self, filename, **options):
-        '''Deprecated; use read_file instead'''
-        module_logger.warning("using deprecated function readFile!")
-        self.read_file(filename, **options)
-
-    def appendRow(self, row):
-        '''Deprecated; use append_row instead'''
-        module_logger.warning("using deprecated function appendRow!")
-        self.append_row(row)
-
-    def addColumn(self, name, dataType="|f8", origin=[], connection=None):
-        '''Deprecated; use add_column instead'''
-        module_logger.warning("using deprecated function addColumn!")
-        self.add_column(name, dataType, origin, connection)
-
-    def writeFile(self, filename, **options):
-        '''Deprecated; use write_file instead'''
-        module_logger.warning("using deprecated function writeFile!")
-        self.write_file(filename, **options)
-
-    def getIndexedColumnGeneral(self, _col_index, _col2_indices=[],
-                                _lambda=None, _deletion=False):
-        '''Deprecated; use get_column_by_index instead'''
-        module_logger.warning(
-            "using deprecated function getIndexedColumnGeneral!")
-        return self.get_column_by_index(_col_index, _col2_indices,
-                                        _lambda, _deletion)
-
-    def getColumnHardRestriction(self, desire, **restrictions):
-        '''Deprecated; use get_column_hard_restriction instead'''
-        module_logger.warning(
-            "using deprecated function getColumnHardRestriction!")
-        return self.get_column_hard_restriction(desire, **restrictions)
-
-    def pullRows(self, desire, **restrictions):
-        '''Deprecated; use pull_rows instead'''
-        module_logger.warning("using deprecated function pullRows!")
-        return self.pull_rows(desire, **restrictions)
-
-    def plot2dData(self, _colx, _coly, errx=None, erry=None,
-                   restrictions={}, label="", fmt=""):
-        '''Deprecated; use plot_2d_data instead'''
-        module_logger.warning("using deprecated function plot2dData!")
-        self.plot_2d_data(_colx, _coly, errx=errx, erry=errx,
-                          restrictions=restrictions, label=label,
-                          fmt=fmt)
-
-    def plot_2d_data(self, _colx, _coly, errx=None, erry=None,
-                     restrictions={}, label="", fmt="", **options):
-        print "function does not exist anymore"
-
-    def retrieve2dPlotData(self, _colx, _coly, errx=None, erry=None,
-                           restrictions={}):
-        '''Deprecated; use retrieve_2d_data instead'''
-        module_logger.warning("using deprecated function retrieve2dPlotData!")
-        return self.retrieve_2d_plot_data(_colx, _coly,
-                                          errx=errx, erry=erry,
-                                          restrictions=restrictions)
-
-    def retrieve3dPlotData(self, _x, _y, _z, **kwargs):
-        '''Deprecated; use retrieve_3d_plot_data instead'''
-        module_logger.warning("using deprecated function retrieve3dPlotData!")
-        return self.retrieve_3d_plot_data(_x, _y, _z, **kwargs)
-
-    def retrieveQuiverPlotData(self, _x, _y, _u, _v, **kwargs):
-        """ returns the needed matrices for creating a matplotlib-like 3d-plot
-        """
-        return self.retrieve_quiver_plot_data(_x, _y, _u, _v, **kwargs)
-
-    def getColumnGeneral(self, _col_name, _col2_names=[],
-                         _lambda=None, _deletion=False):
-        '''Deprecated; use get_column_general instead'''
-        module_logger.warning("using deprecated function getColumnGeneral!")
-        return self.get_column_general(_col_name, _col2_names,
-                                       _lambda, _deletion)
-
-    def getColumn(self, desire):
-        '''Deprecated; use get_column instead'''
-        module_logger.warning("using deprecated function getColumn!")
-        return self.get_column(desire)
-
-    def getPossibleValues(self, colName, **restrictions):
-        '''Deprecated; use get_possible_values instead'''
-        module_logger.warning("using deprecated function getPossibleValues!")
-        return self.get_possible_values(colName, **restrictions)
-
+    #def setColumnNames(self, *keyw, **options):
+    #def setDataType(self, new_dataType):
+    #def readFile(self, filename, **options):
+    #def appendRow(self, row):
+    #def addColumn(self, name, dataType="|f8", origin=[], connection=None):
+    #def writeFile(self, filename, **options):
+    #def getIndexedColumnGeneral(self, _col_index, _col2_indices=[],
+                                #_lambda=None, _deletion=False):
+    #def getColumnHardRestriction(self, desire, **restrictions):
+    #def pullRows(self, desire, **restrictions):
+    #def plot2dData(self, _colx, _coly, errx=None, erry=None,
+                          #fmt=fmt)
+    #def plot_2d_data(self, _colx, _coly, errx=None, erry=None,
+                     #restrictions={}, label="", fmt="", **options):
+    #def retrieve2dPlotData(self, _colx, _coly, errx=None, erry=None,
+                           #restrictions={}):
+    #def retrieve3dPlotData(self, _x, _y, _z, **kwargs):
+    #def retrieveQuiverPlotData(self, _x, _y, _u, _v, **kwargs):
+    #def getColumnGeneral(self, _col_name, _col2_names=[],
+                         #_lambda=None, _deletion=False):
+    #def getColumn(self, desire):
+    #def getPossibleValues(self, colName, **restrictions):
 
 if __name__ == "__main__":
     set_debug_level("debug")
