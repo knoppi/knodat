@@ -118,6 +118,15 @@ class MultiMap:
         # we need a numerical zero
         self.zero = 1e-10
 
+        # we need a default running average size
+        self.running_average_N = 1
+
+        # we need a default grid
+        self.chosen_grid = "squaregrid"
+
+        # we need to set the completeness of our data
+        self.complete = True
+
         module_logger.debug("-- MultiMap initialized")
 
     def __setitem__(self, key, value):
@@ -165,21 +174,27 @@ class MultiMap:
         print "MultiMap contains %i entries" % self.length()
         print "MultiMap shape: %s" % (self.data.shape, )
 
-        for column in self.columns:
-            values = self.get_possible_values(column)
-            formatting = "%27s %13s: %s"
-            if len(values) == 1:
-                print formatting % ("fixed parameter", column, values[0])
-            elif len(values) < 5:
-                print formatting % ("parameter with few values",
-                                    column, values)
-            else:
-                limits = ("%s - %s" % (min(values), max(values)))
-                description = "parameter with %i values" % len(values)
-                print formatting % (description, column, limits)
+        if self.length() > 1:
+            for column in self.columns:
+                values = self.get_possible_values(column)
+                formatting = "%27s %13s: %s"
+                if len(values) == 1:
+                    print formatting % ("fixed parameter", column, values[0])
+                elif len(values) < 5:
+                    print formatting % ("parameter with few values",
+                                        column, values)
+                else:
+                    limits = ("%s - %s" % (min(values), max(values)))
+                    description = "parameter with %i values" % len(values)
+                    print formatting % (description, column, limits)
 
     def length(self):
-        return self.data.shape[0]
+        try:
+            return self.data.shape[0]
+        except IndexError:
+            # let's just assume that we only have one entry
+            #print self.data
+            return 1
 
     def set_column_names(self, *keyw, **options):
         """sets the names of the columns and - if needed - the
@@ -784,6 +799,15 @@ class MultiMap:
     def set_zero(self, value):
         self.zero = value
 
+    def set_N(self, value):
+        self.running_average_N = value
+
+    def set_grid(self, value):
+        self.chosen_grid = value
+
+    def set_complete(self, value):
+        self.complete = value
+
     def sort(self, column):
         """ sorts the MultiMap along column
         """
@@ -902,6 +926,22 @@ class MultiMap:
         x = 0.5 * (bin_edges[0:-1] + bin_edges[1:])
 
         return (x, hist)
+
+    def get(self, *args, **keywargs):
+        if len(args) == 1:
+            return self.get_possible_values(
+                *args, **keywargs)
+        if len(args) == 2:
+            return self.retrieve_2d_plot_data(
+                *args, restrictions=keywargs, 
+                N=self.running_average_N)
+        if len(args) == 3:
+            return self.retrieve_3d_plot_data(
+                *args, restrictions=keywargs, 
+                N=self.running_average_N, grid=self.chosen_grid,
+                data_is_complete=self.complete)
+        else:
+            pass
 
     def retrieve_2d_plot_data(
         self, _colx, _coly, errx=None, erry=None, N=1,
@@ -1033,7 +1073,10 @@ class MultiMap:
         if data_is_complete is False:
             for row in data:
                 xi = 0
-                xi = int(np.where(x == row[_x])[0][0] / 2)
+                if grid == "graphenegrid":
+                    xi = int(np.where(x == row[_x])[0][0] / 2)
+                else:
+                    xi = int(np.where(x == row[_x])[0][0] / 1)
                 yi, = np.where(y == row[_y])[0]
                 Z[yi, xi] = row[_z]
         else:
