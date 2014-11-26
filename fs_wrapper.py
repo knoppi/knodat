@@ -8,7 +8,7 @@ import collections
 
 module_logger = logging.getLogger("FS Wrapper")
 formatting = logging.Formatter(
-    fmt = "%(relativeCreated)d -- %(name)s -- %(levelname)s -- %(message)s")
+    fmt="%(relativeCreated)d -- %(name)s -- %(levelname)s -- %(message)s")
 
 ch = logging.StreamHandler()
 ch.setFormatter(formatting)
@@ -16,36 +16,41 @@ ch.setLevel(logging.WARNING)
 
 module_logger.addHandler(ch)
 
-def ls(what = "", directory = "."):
-    if not directory.endswith("/"): directory = directory + "/"
+
+def ls(what="", directory="."):
+    if not directory.endswith("/"):
+        directory = directory + "/"
     module_logger.info("ls() -- directory: %s" % directory)
 
     tmp = os.listdir(directory)
     todelete = list()
 
-    for i in range( len( tmp ) ):
-        if not re.match( what, tmp[i] ):
+    for i in range(len(tmp)):
+        if not re.match(what, tmp[i]):
             todelete.append(i)
 
     todelete.reverse()
     for i in todelete:
         tmp.__delitem__(i)
 
-    for i in range( len( tmp ) ):
+    for i in range(len(tmp)):
         tmp[i] = directory + tmp[i]
 
     return tmp
 
-def extractParametersFromFilename( filename ):
+
+def extractParametersFromFilename(filename):
     """ deprecated, please use extract_parameters_from_filename """
     module_logger.warning(
-            "using deprecated function extractParametersFromFilename!")
+        "using deprecated function extractParametersFromFilename!")
     return extract_parameters_from_filename(filename)
 
-def extract_parameters_from_filename(filename, tail = 2, orientation = True):
+
+def extract_parameters_from_filename(filename, tail=2, orientation=True,
+                                     return_tail=False):
     """ Takes a given filename and returns an array with extracted parameters
-    filename is the name given to numerical output according to some fixed 
-    scheme. Parts of the filename are separated by unsderscores "_", decimal 
+    filename is the name given to numerical output according to some fixed
+    scheme. Parts of the filename are separated by unsderscores "_", decimal
     points are replaced by "p", so Latex and gnuplot can also work with the
     files. The first element is some explanatory abbreviation, the physical
     parameters come next alternating name and value. The return value is a
@@ -64,26 +69,28 @@ def extract_parameters_from_filename(filename, tail = 2, orientation = True):
     """
     tmp = filename.split("/")[-1]
 
-    information = tmp.split( "_" )
+    information = tmp.split("_")
     results = collections.OrderedDict()
-    index_correction_due_to_orientation = 1
-    if orientation == True:
+    if orientation is True:
         results["orientation"] = information[0][:]
-        index_correction_due_to_orientation = 0
-    for i in range( (len(information) - tail) / 2 ):
-        key = information[ 2 * i + 1 ]
-        value =  float( information[ 2 * i + 2 ].replace( "p","." ) )
-        results[ key ] = value
+    for i in range((len(information) - tail) / 2):
+        key = information[2 * i + 1]
+        value = float(information[2 * i + 2].replace("p", "."))
+        results[key] = value
+
+    if return_tail is True:
+        results["__tail__"] = information[-1]
+
     return results
 
-def filename_from_parameters(parameters, prefix = "ZZ", suffix = "bla.out"):
+
+def filename_from_parameters(parameters, prefix="ZZ", suffix="bla.out"):
     final_array = [prefix]
     final_array.extend(
-            [("%s_%g" % (key, val)).replace(".","p")
-                for key, val in parameters.items()])
+        [("%s_%g" % (key, val)).replace(".", "p")
+         for key, val in parameters.items()])
     final_array.append(suffix)
 
     result = "_".join(final_array)
-    
 
     return result

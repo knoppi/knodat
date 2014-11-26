@@ -24,6 +24,7 @@ ch.setLevel(logging.WARNING)
 module_logger.addHandler(ch)
 module_logger.setLevel(logging.WARNING)
 
+
 def set_debug_level(level):
     possible_levels = dict(
         debug=logging.DEBUG, info=logging.INFO, warning=logging.WARNING,
@@ -193,7 +194,7 @@ class MultiMap:
             return self.data.shape[0]
         except IndexError:
             # let's just assume that we only have one entry
-            #print self.data
+            # print self.data
             return 1
 
     def set_column_names(self, *keyw, **options):
@@ -317,7 +318,7 @@ class MultiMap:
         """ returns a subset of data with hard restrictions
         """
         # We define two functions for comparison of the restrictions
-        # with our data. 
+        # with our data.
         # hard_restriction requires an exact agreement and is suitable
         # for exact data as strings
         # soft_restriction checks for agreement within a given tolerance
@@ -492,6 +493,8 @@ class MultiMap:
 
     def append_data(self, other):
         """ concatenate MultiMap with a second one """
+        print type(self.data)
+        print self.data.shape
         try:
             self.data = np.append(self.data, other.data)
         except:
@@ -500,7 +503,10 @@ class MultiMap:
     def add_to_column(self, col, values):
         """ modifies column by adding values """
         try:
-            self.data[:, col] = self.data.column[:, col] + values.transpose()
+            self.data[col] = self.data[col] + values.transpose()
+        except AttributeError:
+            # It seem's we're only adding a single number
+            self.data[col] = self.data[col] + values
         except:
             raise
 
@@ -564,28 +570,32 @@ class MultiMap:
 
         # here the actual reduction begins
         module_logger.info(
-                "... start with the actual reduction with %i key indices" % 
-                key_indices.shape[0])
+            "... start with the actual reduction with %i key indices" %
+            key_indices.shape[0])
 
-        self.reduction_single_core(static, averaging_cols, columns_of_new_object, key_indices, method, statistics)
-        #self.reduction_distributed_dispy(static, averaging_cols, columns_of_new_object, key_indices, method, statistics)
+        self.reduction_single_core(
+            static, averaging_cols, columns_of_new_object,
+            key_indices, method, statistics)
 
-    def reduction_single_core(self, static, averaging_cols, columns_of_new_object, key_indices, method, statistics):
+    def reduction_single_core(self, static, averaging_cols,
+                              columns_of_new_object,
+                              key_indices, method, statistics):
         import time
 
         # setup progressbar
         symbols = itertools.cycle(r"|/-\\")
         progressbar_width = 80
-        
+
         try:
             pb_step = int(len(key_indices) / progressbar_width)
-            pb_indices = list((key_indices[::pb_step])[-progressbar_width + 1:])
+            pb_indices = list(
+                (key_indices[::pb_step])[-progressbar_width + 1:])
             pb_indices.append(key_indices[-1])
         except ValueError:
             progressbar_width = len(key_indices) - 1
             pb_indices = key_indices
-        pb_indices2 = []
-        
+        #pb_indices2 = []
+
         sys.stdout.write("[%s]" % (" " * progressbar_width))
         sys.stdout.flush()
         sys.stdout.write("\b" * (progressbar_width + 1))
@@ -595,7 +605,8 @@ class MultiMap:
         for idx, i in enumerate(key_indices[1:]):
             current_subset = self.data[key_indices[idx]:i]
 
-            new_row = reduce_subset(current_subset[:], static, averaging_cols, statistics, method)
+            new_row = reduce_subset(
+                current_subset[:], static, averaging_cols, statistics, method)
             new_object.append_row(new_row)
 
             if i in pb_indices:
@@ -614,7 +625,9 @@ class MultiMap:
         self.dataType = new_object.dataType
         self.columns = list(self.data.dtype.names)
 
-    def reduction_distributed_dispy(self, static, averaging_cols, columns_of_new_object, key_indices, method, statistics):
+    def reduction_distributed_dispy(self, static, averaging_cols,
+                                    columns_of_new_object, key_indices,
+                                    method, statistics):
         import dispy
         import time
 
@@ -624,13 +637,14 @@ class MultiMap:
 
         try:
             pb_step = int(len(key_indices) / progressbar_width)
-            pb_indices = list((key_indices[::pb_step])[-progressbar_width + 1:])
+            pb_indices = list(
+                (key_indices[::pb_step])[-progressbar_width + 1:])
             pb_indices.append(key_indices[-1])
         except ValueError:
             progressbar_width = len(key_indices)
             pb_indices = range(progressbar_width)
         pb_indices2 = []
-        
+
         cluster = dispy.JobCluster(reduce_subset)
         jobs = []
 
@@ -642,7 +656,8 @@ class MultiMap:
         for idx, i in enumerate(key_indices[1:]):
             current_subset = self.data[key_indices[idx]:i][:]
 
-            job = cluster.submit(current_subset, static, averaging_cols, statistics, method)
+            job = cluster.submit(current_subset, static,
+                                 averaging_cols, statistics, method)
             jobs.append(job)
 
             if i in pb_indices:
@@ -658,12 +673,12 @@ class MultiMap:
         sys.stdout.write("collecting: [%s]" % (" " * progressbar_width))
         sys.stdout.flush()
         sys.stdout.write("\b" * (progressbar_width + 1))
-        
+
         new_object = MultiMap(_cols=columns_of_new_object)
         for idx, job in enumerate(jobs):
             new_row = job()
             new_object.append_row(new_row)
-            
+
             if idx in pb_indices2:
                 sys.stdout.write("-")
                 sys.stdout.flush()
@@ -672,10 +687,9 @@ class MultiMap:
                 sys.stdout.write("\b")
                 sys.stdout.flush()
 
-
         sys.stdout.write("\n")
         cluster.stats()
-        
+
         end = time.clock()
         print end - start
 
@@ -752,7 +766,7 @@ class MultiMap:
                 self.separator = val
             if key == "fieldnames":
                 self.set_column_names(val)
-            #if key == "skipinitialspaces":
+            # if key == "skipinitialspaces":
                 #skipInitialSpaces = val
 
         # now three cases can be thought of:
@@ -928,16 +942,19 @@ class MultiMap:
         return (x, hist)
 
     def get(self, *args, **keywargs):
+        if len(args) == 0:
+            R = dict(keywargs)
+            return self.get_subset(R)
         if len(args) == 1:
             return self.get_possible_values(
                 *args, **keywargs)
         if len(args) == 2:
             return self.retrieve_2d_plot_data(
-                *args, restrictions=keywargs, 
+                *args, restrictions=keywargs,
                 N=self.running_average_N)
         if len(args) == 3:
             return self.retrieve_3d_plot_data(
-                *args, restrictions=keywargs, 
+                *args, restrictions=keywargs,
                 N=self.running_average_N, grid=self.chosen_grid,
                 data_is_complete=self.complete)
         else:
@@ -1132,7 +1149,7 @@ class MultiMap:
 
         x = np.unique(data[::][_x])
         y = np.unique(data[::-1][_y])
-        u = (data[::][_u])
+        #u = (data[::][_u])
 
         # for graphene we have to reduce the x-dimension by a factor of 2
         X = np.zeros((1, 1))
@@ -1201,28 +1218,28 @@ class MultiMap:
 
     # Old functions with camelCase-naming, deleted on 2014-05-13
     #
-    #def setColumnNames(self, *keyw, **options):
-    #def setDataType(self, new_dataType):
-    #def readFile(self, filename, **options):
-    #def appendRow(self, row):
-    #def addColumn(self, name, dataType="|f8", origin=[], connection=None):
-    #def writeFile(self, filename, **options):
-    #def getIndexedColumnGeneral(self, _col_index, _col2_indices=[],
+    # def setColumnNames(self, *keyw, **options):
+    # def setDataType(self, new_dataType):
+    # def readFile(self, filename, **options):
+    # def appendRow(self, row):
+    # def addColumn(self, name, dataType="|f8", origin=[], connection=None):
+    # def writeFile(self, filename, **options):
+    # def getIndexedColumnGeneral(self, _col_index, _col2_indices=[],
                                 #_lambda=None, _deletion=False):
-    #def getColumnHardRestriction(self, desire, **restrictions):
-    #def pullRows(self, desire, **restrictions):
-    #def plot2dData(self, _colx, _coly, errx=None, erry=None,
-                          #fmt=fmt)
-    #def plot_2d_data(self, _colx, _coly, errx=None, erry=None,
-                     #restrictions={}, label="", fmt="", **options):
-    #def retrieve2dPlotData(self, _colx, _coly, errx=None, erry=None,
-                           #restrictions={}):
-    #def retrieve3dPlotData(self, _x, _y, _z, **kwargs):
-    #def retrieveQuiverPlotData(self, _x, _y, _u, _v, **kwargs):
-    #def getColumnGeneral(self, _col_name, _col2_names=[],
+    # def getColumnHardRestriction(self, desire, **restrictions):
+    # def pullRows(self, desire, **restrictions):
+    # def plot2dData(self, _colx, _coly, errx=None, erry=None,
+                          # fmt=fmt)
+    # def plot_2d_data(self, _colx, _coly, errx=None, erry=None,
+                     # restrictions={}, label="", fmt="", **options):
+    # def retrieve2dPlotData(self, _colx, _coly, errx=None, erry=None,
+                           # restrictions={}):
+    # def retrieve3dPlotData(self, _x, _y, _z, **kwargs):
+    # def retrieveQuiverPlotData(self, _x, _y, _u, _v, **kwargs):
+    # def getColumnGeneral(self, _col_name, _col2_names=[],
                          #_lambda=None, _deletion=False):
-    #def getColumn(self, desire):
-    #def getPossibleValues(self, colName, **restrictions):
+    # def getColumn(self, desire):
+    # def getPossibleValues(self, colName, **restrictions):
 
 if __name__ == "__main__":
     set_debug_level("debug")
