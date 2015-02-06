@@ -1,0 +1,11 @@
+Feature to implemented in the future
+    - write unit tests
+    - unit tests as a sort of example?
+    - document evtools
+
+Other todo:
+    - delete deprecated methods
+    - uniform structure in function / method headers
+    - strange collection of getitem methods -> clean and define deprecated methods
+    - conformity with PEP-XXX
+    - what to do with debug output?

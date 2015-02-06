@@ -70,7 +70,7 @@ class BSParser:
         self.bs.set_column_names(*columns)
         self.bs.read_file(_filename)
 
-    def plot(self, color = None, fmt = "", xscaling = 1.0, yscaling = 1.0, 
+    def plot(self, color = None, fmt = "", xscaling = 1.0, yscaling = 1.0,
             markersize = 4.0, ymin = -100, ymax = 100, shiftx = 0.0, shifty = 0.0):
         self.bs.sort('_k')
         kvals = xscaling * self.bs.get_column( '_k' ) + shiftx
@@ -114,16 +114,16 @@ class BSParser:
 
     def getMarkedBands( self ):
         result = []
-        for i in range(len(diag.lines)): 
+        for i in range(len(diag.lines)):
             if diag.lines[i].get_marker() == 'o': result.append( i+1 )
         return result
 
     def getHiddenBands( self ):
         result = []
-        for i in range(len(diag.lines)): 
+        for i in range(len(diag.lines)):
             if diag.lines[i].get_linestyle() == 'None': result.append( i+1 )
         return result
-    
+
     def showBS( self ):
         plt.show()
 
@@ -146,7 +146,7 @@ class BSParser:
 
         for i in range( 1, self.number_of_columns+1 ):
             column_name = ( '_b%i' % i )
-            
+
             lower_limit = self.bs.get_minimum_value(column_name)
             upper_limit = self.bs.get_maximum_value(column_name)
 
@@ -200,7 +200,7 @@ class BSParser:
                     gaps.append(gap)
             except:
                 raise
-        
+
         return bands, gaps
 
 def usage():
@@ -235,7 +235,7 @@ if __name__ == '__main__':
     import getopt, sys
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'g', 
+        opts, args = getopt.getopt(sys.argv[1:], 'g',
                                    ['eps','pdf','png','xlim=','ylim=','title=',
                                     'color=','fmt=', "debug", "info", "help",
                                     "gaps", "rescalex=", "rescaley="])
@@ -245,7 +245,7 @@ if __name__ == '__main__':
         if ("--help", '') in opts:
             raise getopt.GetoptError("")
 
-        
+
         # if asked for, set debug or info output
         if ("--info", '') in opts:
                 set_debug_level("info")
@@ -270,7 +270,7 @@ if __name__ == '__main__':
                 plotting_options["xscaling"] = float(val)
             if opt == "--rescaley":
                 plotting_options["yscaling"] = float(val)
-            if opt == "--ylim": 
+            if opt == "--ylim":
                 module_logger.info("setting ylimits to %s" % val)
                 ylimits = val.split(":")
                 plotting_options["ymin"] = float(ylimits[0])
@@ -287,18 +287,18 @@ if __name__ == '__main__':
         # postprocessing
         #######################################################################
         for opt,val in opts:
-            if opt == "--xlim": 
+            if opt == "--xlim":
                 module_logger.info("setting xlimits to %s" % val)
                 xlimits = val.split( ":" )
                 plt.xlim( float( xlimits[0] ), float( xlimits[1] ) )
-            if opt == "--ylim": 
+            if opt == "--ylim":
                 module_logger.info("setting ylimits to %s" % val)
                 ylimits = val.split(":")
                 plt.ylim(float( ylimits[0]), float(ylimits[1]))
             if opt == "--title":
                 logging.info("setting title to %s" % val)
                 plt.title(val)
-        
+
         # postprocessing, a second step
         #######################################################################
         for opt,val in opts:
@@ -316,6 +316,6 @@ if __name__ == '__main__':
                 plt.savefig(outfileName)
 
         plt.show()
-    
+
     except getopt.GetoptError:
         usage()

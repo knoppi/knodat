@@ -18,6 +18,14 @@ module_logger.addHandler(ch)
 
 
 def ls(what="", directory="."):
+    """
+    Return content of a directory.
+
+    :param str what: regular expression restricting directory listing
+    :param str directory: path that shall be searched
+
+    Rough equivalent of ``ls`` command available on the linux command line
+    """
     if not directory.endswith("/"):
         directory = directory + "/"
     module_logger.info("ls() -- directory: %s" % directory)
@@ -40,7 +48,6 @@ def ls(what="", directory="."):
 
 
 def extractParametersFromFilename(filename):
-    """ deprecated, please use extract_parameters_from_filename """
     module_logger.warning(
         "using deprecated function extractParametersFromFilename!")
     return extract_parameters_from_filename(filename)
@@ -48,7 +55,8 @@ def extractParametersFromFilename(filename):
 
 def extract_parameters_from_filename(filename, tail=2, orientation=True,
                                      return_tail=False):
-    """ Takes a given filename and returns an array with extracted parameters
+    """
+    Takes a given filename and returns an array with extracted parameters
     filename is the name given to numerical output according to some fixed
     scheme. Parts of the filename are separated by unsderscores "_", decimal
     points are replaced by "p", so Latex and gnuplot can also work with the
@@ -85,6 +93,17 @@ def extract_parameters_from_filename(filename, tail=2, orientation=True,
 
 
 def filename_from_parameters(parameters, prefix="ZZ", suffix="bla.out"):
+    """
+    Return a string created from dict ``parameters``, ``prefix`` and ``suffix``.
+
+    This method is basically the inverse of
+    :func:`extract_parameters_from_filename`. Given the example there we can
+    pass the returned dictionary as ``parameters``, "AC" as ``prefix`` and
+    "transmissionsx.out" as ``suffix`` we would recover the original filename.
+    Note that decimal points get replaced by "p". The intention of this
+    behaviour was to avoid problems when using the created files in gnuplot
+    or latex.
+    """
     final_array = [prefix]
     final_array.extend(
         [("%s_%g" % (key, val)).replace(".", "p")

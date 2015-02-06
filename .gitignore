@@ -1,0 +1,5 @@
+.ropeproject
+doc/build
+
+# ignore Python bytecode
+*.pyc
