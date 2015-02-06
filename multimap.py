@@ -202,6 +202,9 @@ class MultiMap:
         :param int few_values: Data description states the range of entries
             unless less than :py:obj:`few_values` are present in the
             :py:class:`MultiMap`.
+
+        This method is intended for use in the command line since the output is
+        written directly to std::out.
         """
         try:
             print "data loaded from: %s" % self.filename
@@ -302,8 +305,10 @@ class MultiMap:
 
     def set_zero(self, value):
         """
-        Set numerical zero used in comparison functions can also be used to
-        control accuracy.
+        Set numerical zero used in comparison functions.
+
+        This method can be used to control accuracy. We can also use for
+        restricting selected data to a certain interval.
         """
         self.zero = value
 
@@ -415,7 +420,7 @@ class MultiMap:
 
     def getitem(self, i):
         """
-        Return a single row of the MultiMap as a dict.
+        Return row ``i`` of the MultiMap as ``dict``-object.
         """
         self.__getitem__(i)
 
@@ -534,7 +539,9 @@ class MultiMap:
         return result[:][_col_name]
 
     def get_column_hard_restriction(self, desire, **restrictions):
-        """ gets the content of column desire under hard (==) restrictions
+        """
+        Return the content of column desire under hard (==) restrictions.
+
         Returns an array according to some hard restriction, i.e.
         requesting column "desire" where all the key of "restrictions"
         exactly have the value given by the values of "restrictions"
@@ -545,8 +552,8 @@ class MultiMap:
 
     def get_column(self, desire):
         """
-        Return column ``desire`` without applying any restrictions as
-        :class:`numpy.ndarray`-object.
+        Return column ``desire`` as :class:`numpy.ndarray`-object without
+        applying any restrictions.
         """
         return self.data[:][desire]
 
@@ -620,7 +627,12 @@ class MultiMap:
             raise
 
     def append_data(self, other):
-        """ Concatenate MultiMap with a second one (with the same dType). """
+        """
+        Concatenate MultiMap with a second one (with the same dType).
+
+        .. todo::
+            Check if combining data with different dtype raises an error.
+        """
         try:
             self.data = np.append(self.data, other.data)
         except:
@@ -628,7 +640,8 @@ class MultiMap:
 
     def add_to_column(self, col, values):
         """
-        Add ``values`` to ``col``.
+        Calculate sum of entries in ``col`` and ``values`` and change ``col``
+        accordingly.
 
         :param str col: Column that will be modified
         :param values: Scalar or numpy.array, scalar will be added to all rows
@@ -1152,8 +1165,9 @@ class MultiMap:
         return temp
 
     def get_histogram(self, col, restrictions={}, **kwargs):
-        """get a histogram for the values in column col
-           """
+        """
+        Return a histogram for the values in column ``col``.
+        """
         kwargs = dict(kwargs)
         x = self.get_column(col)
 

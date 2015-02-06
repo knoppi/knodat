@@ -1,37 +1,27 @@
 .. include:: global.rst
 
-knodat package
+Multimap
 ==============
-
-module
-----------------------
 
 .. automodule:: knodat.multimap
 
     .. autoclass:: MultiMap
 
         We group the methods as
-            #. :ref:`Unclassified methods <unclassified>`
+            #. :ref:`Deprecated methods <deletable>`
             #. :ref:`Filesystem access <fs_methods>`
             #. :ref:`Descriptive methods <descriptive_methods>`
             #. :ref:`Metadata manipulation <metadata_manipulation>`
             #. :ref:`Data retrieval <data_retrieval>`
             #. :ref:`Data manipulation <data_manipulation>`
         
-        .. _unclassified:
+        .. _deletable:
 
-        :methodgroup:`Unclassified methods`
+        :methodgroup:`To delete`
 
-        Here go methods that I cannot classify yet.
-
-        .. automethod:: __init__
-        .. automethod:: __setitem__
-        .. automethod:: __iter__
         .. automethod:: select_indexing_column
         .. automethod:: set_x_column
         .. automethod:: show
-        .. automethod:: sort
-        .. automethod:: mean
         .. automethod:: plot
 
         .. _fs_methods:
@@ -64,6 +54,7 @@ module
         .. automethod:: set_N
         .. automethod:: set_grid
         .. automethod:: set_complete
+        .. automethod:: sort
 
         .. _data_retrieval:
         
@@ -84,14 +75,21 @@ module
         .. automethod:: getitem_by_x
         .. automethod:: getitem
         .. automethod:: get_column_by_index
-        .. automethod:: get_histogram
         .. automethod:: get_column_general
         .. automethod:: get_column_hard_restriction
         .. automethod:: retrieve_quiver_plot_data
+        .. automethod:: get_histogram
+        .. automethod:: mean
 
         .. _data_manipulation:
         
         :methodgroup:`Data manipulation`
+
+        The following methods were written with the intention to easily alter 
+        the stored data. While other methods also change the object in one way 
+        or the other, these functions substantiantly modify the data - 
+        potentially in an irreversible manner.
+
 
         .. automethod:: append_row
         .. automethod:: append_data

@@ -32,6 +32,7 @@ Contents:
    :maxdepth: 2
 
    multimap
+   fs_wrapper
 
 TODOS
 ============
