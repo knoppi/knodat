@@ -105,8 +105,8 @@ class MultiMap:
     """
     Class for organizing large datasets.
 
-    :param str _fileName: Name of a file to load the data from.
-    :param list _cols: List of column names
+    :param str filename: Name of a file to load the data from.
+    :param list columns: List of column names
 
     :py:class:`MultiMap` acts as a kind of small in-memory database with special
     methods for fast operations on columns required for the operation on large
@@ -133,26 +133,29 @@ class MultiMap:
     :py:meth:`read_file_numpy_style` for further instructions.
     """
 
-    def __init__(self, _fileName=None, _cols=None):
+    def __init__(self, filename=None, columns=None, **kwargs):
+        # renaming function parameters requires caring for backwards
+        # compatibility:
+        if "_fileName" in kwargs.keys():
+            filename = kwargs["_fileName"]
+        if "_cols" in kwargs.keys():
+            columns = kwargs["_cols"]
+
         module_logger.info("MultiMap initialization:")
-        module_logger.debug("-- filename: %s" % _fileName)
-        module_logger.debug("-- columns: %s" % _cols)
+        module_logger.debug("-- filename: %s" % filename)
+        module_logger.debug("-- columns: %s" % columns)
 
         self.commentIndicators = ['#']
         self.columns = []
         self.dataType = []
 
-        if _cols is not None:
-            self.set_column_names(*_cols)
-        if _fileName is not None:
-            if _fileName[-4:] == '.npy':
-                self.read_file_numpy_style(_fileName)
+        if columns is not None:
+            self.set_column_names(*columns)
+        if filename is not None:
+            if filename[-4:] == '.npy':
+                self.read_file_numpy_style(filename)
             else:
-                self.read_file(_fileName)
-
-        # As long as we do not define a column to be the indexing column
-        # getitem_by_index should be chosen to retrieve a single row
-        self.getitem_method = self.getitem_by_index
+                self.read_file(filename)
 
         # we need a numerical zero
         self.zero = 1e-10
@@ -225,6 +228,12 @@ class MultiMap:
     #
     section_structure = True
 
+    def __eq__(self, other):
+        """
+        Compare to MultiMaps if they contain the same data and have the same
+        datatype.
+        """
+        return np.all((self.data == other.data))
     """
     Filesystem access
     """
@@ -418,7 +427,7 @@ class MultiMap:
         if "dType" in options.keys():
             standardType = options["dType"]
         else:
-            standardType = np.float64
+            standardType = "<f8"
 
         for i in column_names:
             new_data_type.append((i, standardType))
@@ -949,7 +958,7 @@ class MultiMap:
     def mean(self, column):
         """ Return the mean value of ``column``. """
         tmp = self.get_column(column)
-        return tmp.mean
+        return tmp.mean()
 
     def get_histogram(self, col, restrictions={}, **kwargs):
         """
@@ -1116,7 +1125,7 @@ class MultiMap:
         self.data.dtype = new_data_type
 
     def reduce(self, columns_to_drop=[], static=[],
-               statistics=True, method=np.mean):
+               statistics=True, method=np.mean, verbose=True):
         """
         Compress data by applying specific operations. Might include reduction
         of available information.
@@ -1139,9 +1148,10 @@ class MultiMap:
             by :func:`numpy.sum`. Any previously defined function can be
             used here.
         """
-        print "performing reduction"
-        print "    columns to drop: %s" % (columns_to_drop,)
-        print "    static columns: %s" % (static,)
+        if verbose is True:
+            print "performing reduction"
+            print "    columns to drop: %s" % (columns_to_drop,)
+            print "    static columns: %s" % (static,)
 
         self.add_column('__sorting__', dataType="|S200",
                         origin=static, connection=create_ordering_column)
@@ -1181,11 +1191,12 @@ class MultiMap:
 
         self.reduction_single_core(
             static, averaging_cols, columns_of_new_object,
-            key_indices, method, statistics)
+            key_indices, method, statistics, verbose)
 
     def reduction_single_core(self, static, averaging_cols,
                               columns_of_new_object,
-                              key_indices, method, statistics):
+                              key_indices, method, statistics,
+                              verbose=True):
         """
         Perform the actual reduction triggered by :meth:`reduce`.
 
@@ -1211,12 +1222,13 @@ class MultiMap:
             pb_indices = key_indices
         #pb_indices2 = []
 
-        sys.stdout.write("[%s]" % (" " * progressbar_width))
-        sys.stdout.flush()
-        sys.stdout.write("\b" * (progressbar_width + 1))
+        if verbose is True:
+            sys.stdout.write("[%s]" % (" " * progressbar_width))
+            sys.stdout.flush()
+            sys.stdout.write("\b" * (progressbar_width + 1))
 
         start = time.clock()
-        new_object = MultiMap(_cols=columns_of_new_object)
+        new_object = MultiMap(columns=columns_of_new_object)
         for idx, i in enumerate(key_indices[1:]):
             current_subset = self.data[key_indices[idx]:i]
 
@@ -1224,17 +1236,19 @@ class MultiMap:
                 current_subset[:], static, averaging_cols, statistics, method)
             new_object.append_row(new_row)
 
-            if i in pb_indices:
-                sys.stdout.write("-")
-                sys.stdout.flush()
-            else:
-                sys.stdout.write(symbols.next())
-                sys.stdout.write("\b")
-                sys.stdout.flush()
-        sys.stdout.write("\n")
+            if verbose is True:
+                if i in pb_indices:
+                    sys.stdout.write("-")
+                    sys.stdout.flush()
+                else:
+                    sys.stdout.write(symbols.next())
+                    sys.stdout.write("\b")
+                    sys.stdout.flush()
+        if verbose is True:
+            sys.stdout.write("\n")
 
-        end = time.clock()
-        print end - start
+            end = time.clock()
+            print end - start
 
         self.data = new_object.data
         self.dataType = new_object.dataType
@@ -1302,7 +1316,7 @@ class MultiMap:
         sys.stdout.flush()
         sys.stdout.write("\b" * (progressbar_width + 1))
 
-        new_object = MultiMap(_cols=columns_of_new_object)
+        new_object = MultiMap(columns=columns_of_new_object)
         for idx, job in enumerate(jobs):
             new_row = job()
             new_object.append_row(new_row)
@@ -1326,38 +1340,4 @@ class MultiMap:
         self.columns = list(self.data.dtype.names)
 
 if __name__ == "__main__":
-    set_debug_level("debug")
-    module_logger.info("create multimap with column a, b and c")
-
-    test_object = MultiMap(_cols=["a", "b", "c"])
-
-    module_logger.info("multimap created")
-
-    module_logger.info("fill test object with content")
-    test_object.append_row([1, 2, 3])
-    test_object.append_row([4, 5, 6])
-    test_object.append_row([7, 8, 9])
-
-    module_logger.info("test object filled with: %s" % test_object.data)
-
-    module_logger.info("adding column 'd' filled with zeros")
-    test_object.add_column("d")
-    module_logger.info("test object in new state: %s" % test_object.data)
-
-    module_logger.info(
-        "adding column 'e' filled with the sum of columns a and b")
-    test_object.add_column("e", origin=["a", "b"], connection=np.add)
-    module_logger.info("test object in new state: %s" % test_object.data)
-
-    module_logger.info("row 1 contains: %s" % test_object[0])
-
-    module_logger.info("choose column 'b' for indexing")
-    test_object.select_indexing_column("b")
-    module_logger.info("row with key %s contains: %s" %
-                       (5.0, test_object[5.0]))
-    module_logger.info("calling non-existent key %s yields: %s" %
-                       (3.0, test_object[3.0]))
-    module_logger.info("calling non-existent key %s yields: %s" %
-                       (1.0, test_object[1.0]))
-
-    test_object.average(["a", "c"], ["d", "e"])
+    print "nothing to do here..."
