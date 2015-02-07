@@ -1,6 +1,6 @@
 .. include:: global.rst
 
-Multimap
+MultiMap
 ==============
 
 .. automodule:: knodat.multimap
@@ -19,10 +19,7 @@ Multimap
 
         :methodgroup:`To delete`
 
-        .. automethod:: select_indexing_column
-        .. automethod:: set_x_column
-        .. automethod:: show
-        .. automethod:: plot
+        currently empty
 
         .. _fs_methods:
         
@@ -70,11 +67,7 @@ Multimap
         .. automethod:: get_maximum_value
         .. automethod:: get_x_of_minimum_value
         .. automethod:: get_x_of_maximum_value
-        .. automethod:: __getitem__
-        .. automethod:: getitem_by_index
-        .. automethod:: getitem_by_x
         .. automethod:: getitem
-        .. automethod:: get_column_by_index
         .. automethod:: get_column_general
         .. automethod:: get_column_hard_restriction
         .. automethod:: retrieve_quiver_plot_data
@@ -101,4 +94,3 @@ Multimap
         .. automethod:: reduce
         .. automethod:: reduction_single_core
         .. automethod:: reduction_distributed_dispy
-        .. automethod:: average
