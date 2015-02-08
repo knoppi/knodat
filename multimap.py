@@ -43,14 +43,21 @@ def gauss_kern(size, sizey=None):
     :params int sizey: Similar as :py:obj:`size`. Only set a finite value here
         if the Gaussian shall not be isotropic.
     """
+
     module_logger.debug("called gauss_kern with size = %i" % size)
     size = int(size)
+
     if not sizey:
         sizey = size
     else:
         sizey = int(sizey)
+
+    if size == 1 and sizey == 1:
+        return [[1]]
+
     x, y = np.mgrid[-size:size + 1, -sizey:sizey + 1]
     g = np.exp(- (x ** 2 / float(size) + y ** 2 / float(sizey)))
+    print g
     return g / g.sum()
 
 
@@ -147,7 +154,7 @@ class MultiMap:
 
         self.commentIndicators = ['#']
         self.columns = []
-        self.dataType = []
+        self.dtype = []
 
         if columns is not None:
             self.set_column_names(*columns)
@@ -171,7 +178,7 @@ class MultiMap:
 
         module_logger.debug("-- MultiMap initialized")
 
-    def __getitem__(self, i):
+    def __getitem__(self, index):
         """
         Retrieve a single row of the MultiMap as a dictionary object
         """
@@ -179,47 +186,37 @@ class MultiMap:
 
         try:
             module_logger.debug("trying to find the key in the key list")
-            i = self.keys.index(i)
-            module_logger.debug("the key is now %s" % i)
+            index = self.keys.index(index)
+            module_logger.debug("the key is now %s" % index)
         except AttributeError as e:
             module_logger.debug("Exception %s" % e)
             module_logger.debug("assuming no key list been given")
         except ValueError as e:
-            module_logger.warning("key %s not in key list" % i)
+            module_logger.warning("key %s not in key list" % index)
 
         # with the key finally found, we cann create the result
         try:
             for j in range(len(self.columns)):
-                tmp[self.columns[j]] = self.data[i][j]
+                tmp[self.columns[j]] = self.data[index][j]
         except IndexError as e:
             module_logger.warning("Calling no-existent key!")
             module_logger.warning(e)
         return tmp
 
-    def getitem(self, i):
+    def getitem(self, index):
         """
-        Return row ``i`` of the MultiMap as ``dict``-object.
+        Return row ``index`` of the MultiMap as ``dict``-object.
         """
-        self.__getitem__(i)
+        self.__getitem__(index)
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, row, value):
         # possible error checking:
         # - key valid (type, index valid)
         # - value is dict and has correct dType
-        module_logger.debug("__setitem__(%s, %s)" % (key, value))
-        try:
-            module_logger.debug("trying to find the key in the key list")
-            i = self.keys.index(key)
-        except AttributeError as e:
-            module_logger.debug("Exception %s" % e)
-            module_logger.debug("assuming no key list been given")
-        except ValueError as e:
-            module_logger.warning("key %s not in key list" % key)
+        module_logger.debug("__setitem__(%s, %s)" % (row, value))
 
         for j, j2 in enumerate(self.columns):
-            module_logger.debug("... setting element '%s' (%i) in row %i "
-                                "to %s" % (j2, j, i, value[j2]))
-            self.data[i][j] = value[j2]
+            self.data[row][j] = value[j2]
 
     def __iter__(self):
         return iter(self.data)
@@ -283,7 +280,7 @@ class MultiMap:
                 column_names = [str(x) for x in range(1, number_of_cols + 1)]
                 self.set_column_names(*column_names)
 
-        self.data = np.loadtxt(filename, dtype=self.dataType)
+        self.data = np.loadtxt(filename, dtype=self.dtype)
 
         module_logger.debug("finished reading file")
 
@@ -295,9 +292,9 @@ class MultiMap:
         '''
         self.filename = filename
         self.data = np.load(filename)
-        self.dataType = self.data.dtype.descr
+        self.dtype = self.data.dtype.descr
         self.columns = []
-        for item in self.dataType:
+        for item in self.dtype:
             self.columns.append(item[0])
 
     def write_file(self, filename, **options):
@@ -327,25 +324,25 @@ class MultiMap:
         '''writes the content of the MultiMap in numpy-style .npy file'''
         np.save(filename, self.data)
 
-    def write_file_for_gnuplot_splot(self, _x, _y, _filename):
-        """ when doing surface plots with gnuplot there have to be empty lines
-            in the data file after each isoline which can be achieved by this
-            method
+    def write_file_for_gnuplot_splot(self, column_x, column_y, filename):
         """
-        outfile = open(_filename, 'w')
+        Write data to ``filename`` in a way suitable for gnuplot's splot.
 
-        xcol = np.str(_x)
-        ycol = np.str(_y)
+        When doing surface plots with gnuplot there have to be empty lines in
+        the data file after each isoline which is performed with this method.
+        """
+        outfile = open(filename, 'w')
 
-        xy_columns = [ycol, xcol]
-        self.sort(xy_columns)
+        xcol = np.str(column_x)
+        ycol = np.str(column_y)
+
+        self.sort([ycol, xcol])
 
         lastx = self.data[0][xcol]
         for row in self.data:
             if row[xcol] < lastx:
-                print ""
                 outfile.write("\n")
-            print " ".join([np.str(x) for x in row])
+
             outfile.write(" ".join([np.str(x) for x in row]))
             outfile.write("\n")
             lastx = row[xcol]
@@ -372,7 +369,7 @@ class MultiMap:
         except:
             raise
 
-        for item in self.dataType:
+        for item in self.dtype:
             print ("%20s: %s" % (item[0], item[1]))
 
         print "MultiMap contains %i entries" % self.length()
@@ -434,22 +431,22 @@ class MultiMap:
 
         self.set_data_type(new_data_type)
 
-    def set_data_type(self, new_dataType):
+    def set_data_type(self, new_data_type):
         """
-        Set the data type of the internal data storage to ``new_dataType``
+        Set the data type of the internal data storage to ``new_data_type``
         and creates a new empty numpy array.
 
         This method is useful in particular is several different data types
         shall be used (like mixtures of strings and numerical values).
         For more details see the :class:`~numpy:numpy.dtype` documentation.
         """
-        module_logger.debug("... data type: %s" % new_dataType)
-        self.dataType = new_dataType
+        module_logger.debug("... data type: %s" % new_data_type)
+        self.dtype = new_data_type
         self.data = np.zeros(
-            (0, len(new_dataType)),
-            dtype=new_dataType)
+            (0, len(new_data_type)),
+            dtype=new_data_type)
 
-        self.columns = [x[0] for x in new_dataType]
+        self.columns = [x[0] for x in new_data_type]
 
     def change_data_type_for_column(self, column, new_data_type):
         """
@@ -458,7 +455,7 @@ class MultiMap:
         module_logger.debug("changing data type for column %s to %s" %
                             (column, new_data_type))
         icolumn = self.columns.index(column)
-        new_dType = self.dataType[:]
+        new_dType = self.dtype[:]
         new_dType[icolumn] = (column, new_data_type)
 
         self.set_data_type(new_dType)
@@ -505,16 +502,16 @@ class MultiMap:
     """
     Data retrieval
     """
-    def get(self, *args, **keywargs):
+    def get(self, *columns, **restrictions):
         """
         Obtain complete subsets or 1- to 3-column slices of the ``MultiMap``
         following restrictions defined in ``keywargs``.
 
         This methods refers to
-            * :meth:`get_subset`, if ``args`` has length 0,
-            * :meth:`get_possible_values`, if ``args`` has length 1,
-            * :meth:`retrieve_2d_plot_data` if ``args`` has length 2,
-            * :meth:`retrieve_3d_plot_data` if ``args`` has length 3.
+            * :meth:`get_subset`, if ``columns`` has length 0,
+            * :meth:`get_possible_values`, if ``columns`` has length 1,
+            * :meth:`retrieve_2d_plot_data` if ``columns`` has length 2,
+            * :meth:`retrieve_3d_plot_data` if ``columns`` has length 3.
 
         The options given in ``keywargs`` are used only for restrictions.
         In order to address the further parameters of the relevant methods
@@ -522,30 +519,30 @@ class MultiMap:
 
         For details see the documentation of the respective methods.
         """
-        if len(args) == 0:
-            R = dict(keywargs)
+        if len(columns) == 0:
+            R = dict(restrictions)
             return self.get_subset(R)
-        if len(args) == 1:
+        if len(columns) == 1:
             return self.get_possible_values(
-                *args, **keywargs)
-        if len(args) == 2:
+                *columns, **restrictions)
+        if len(columns) == 2:
             return self.retrieve_2d_plot_data(
-                *args, restrictions=keywargs,
+                *columns, restrictions=restrictions,
                 N=self.running_average_N)
-        if len(args) == 3:
+        if len(columns) == 3:
             return self.retrieve_3d_plot_data(
-                *args, restrictions=keywargs,
+                *columns, restrictions=restrictions,
                 N=self.running_average_N, grid=self.chosen_grid,
                 data_is_complete=self.complete)
         else:
             pass
 
-    def get_column(self, desire):
+    def get_column(self, column_name):
         """
-        Return column ``desire`` as :class:`numpy.ndarray`-object without
+        Return column ``column_name`` as :class:`numpy.ndarray`-object without
         applying any restrictions.
         """
-        return self.data[:][desire]
+        return self.data[:][column_name]
 
     # methods for write access to the data in the multimap
     #
@@ -599,57 +596,64 @@ class MultiMap:
 
         return result
 
-    def get_possible_values(self, colName, **restrictions):
+    def get_possible_values(self, column_name, **restrictions):
         """
-        Return a unique list of values in column ``colName``.
+        Return a unique list of values in column ``column_name``.
 
         The list of ``restrictions`` can be used to limit the resulting values.
         This method internally calls :meth:`get_column_hard_restriction` and
         removes duplicates from the result.
         """
         temp = np.unique(
-            self.get_column_hard_restriction(colName, **restrictions))
+            self.get_column_hard_restriction(column_name, **restrictions))
         return temp
 
     def retrieve_2d_plot_data(
-        self, _colx, _coly, errx=None, erry=None, N=1,
-            restrictions={}, trim=True):
+            self, column_x, column_y, column_x_error=None, column_y_error=None,
+            N=1, restrictions={}, trim=True
+            ):
         """
         Return data ready for 2D plotting.
 
-        :param str _colx: name of x-column
-        :param str _coly: name of y-column
-        :param str errx: name of column containing x error
-        :param str erry: name of column containing y error
+        :param str column_x: name of x-column
+        :param str column_y: name of y-column
+        :param str column_x_error: name of column containing x error
+        :param str column_y_error: name of column containing y error
         :param int N: number of points included in running average
         :param dict restrictions: limit to a certain subset
-        :param bool trim: don't know
+        :param bool trim: If running average is performed (N>1) this parameter
+            controls if the data is cut at the edges.
         :return: tuple with x-, y-data and possibly errorbar sizes.
-
-        .. todo::
-            What is trim?
 
         This method returns a tuple of array containing the data for the plot.
         Size of the tuple depends on given arguments. If errorbars are desired
         they are included in the returned array.
         """
-        _colx = str(_colx)
-        _coly = str(_coly)
-        module_logger.debug(
-            "retrieving plot data %s vs %s" % (_colx, _coly))
-        module_logger.debug("errorbars are %s, %s" % (errx, erry))
-        self.sort(_colx)
-        xvals = self.get_column_hard_restriction(_colx, **restrictions)
-        yvals = self.get_column_hard_restriction(_coly, **restrictions)
-        xerrs = (0 if errx is None else
-                 self.get_column_hard_restriction(errx, **restrictions))
-        yerrs = (0 if erry is None else
-                 self.get_column_hard_restriction(erry, **restrictions))
+        column_x = str(column_x)
+        column_y = str(column_y)
 
+        module_logger.debug(
+            "retrieving plot data %s vs %s" % (column_x, column_y))
+        module_logger.debug(
+            "errorbars are %s, %s" % (column_x_error, column_y_error))
+
+        # fetch the data
+        self.sort(column_x)
+        xvals = self.get_column_hard_restriction(column_x, **restrictions)
+        yvals = self.get_column_hard_restriction(column_y, **restrictions)
+        xerrs = (
+            0 if column_x_error is None else
+            self.get_column_hard_restriction(column_x_error, **restrictions)
+        )
+        yerrs = (
+            0 if column_y_error is None else
+            self.get_column_hard_restriction(column_y_error, **restrictions)
+        )
+
+        # perform running average
         if N > 1:
             g = gauss_kern_1d(N)
             module_logger.debug(g)
-            #xvals = ssignal.convolve(xvals, g, 'same')
             yvals = ssignal.convolve(yvals, g, 'same')
 
             if trim is True:
@@ -664,36 +668,33 @@ class MultiMap:
                 except TypeError:
                     pass
 
-        if errx is None and erry is None:
+        # setup returned tuple
+        if column_x_error is None and column_y_error is None:
             return (xvals, yvals)
-        elif errx is None and erry is not None:
+        elif column_x_error is None and column_y_error is not None:
             return (xvals, yvals, yerrs)
-        elif errx is not None and erry is None:
+        elif column_x_error is not None and column_y_error is None:
             return (xvals, yvals, xerrs)
         else:
             return (xvals, yvals, xerrs, yerrs)
 
-    def retrieve_3d_plot_data(self, _x, _y, _z, N=2, data_is_complete=True,
-                              *args, **kwargs):
+    def retrieve_3d_plot_data(self, column_x, column_y, column_z, N=2,
+                              data_is_complete=True, restrictions={},
+                              **kwargs):
         """
         Return data ready for a 3D plot using matplotlib.
 
-        :param str _x: name of x-column
-        :param str _y: name of y-column
-        :param str _z: name of z-column
+        :param str column_x: name of x-column
+        :param str column_y: name of y-column
+        :param str column_z: name of z-column
         :param int N: size of (two-dimensional) smoothing area
         :param bool data_is_complete: defines if all lattice points contain
             data, which is required for fast data retrieval of large datasets,
             where reshaping is used to put data and meshgrid into accordance.
         :return: tuple of x-, y- and z-data and the x-y-extent
         """
-        try:
-            restrictions = kwargs["restrictions"]
-        except KeyError:
-            restrictions = {}
-        except:
-            raise
 
+        # evaluate options
         try:
             grid = kwargs['grid']
         except KeyError:
@@ -701,57 +702,39 @@ class MultiMap:
         except:
             raise
 
-        deletion = False
-        if "deletion" in kwargs.keys():
-            deletion = kwargs['deletion']
+        # we need a strict ordering for simple reshaping (if possible)
+        self.sort([column_y, column_x])
 
-        # retrieve the subset according to restrictions
-        data = self.get_subset(
-            restrictions=restrictions, deletion=deletion)
-        data = np.sort(data, order=[_y, _x])
+        # Create x-y-arrays
+        x = self.get_possible_values(column_x, **restrictions)
+        y = self.get_possible_values(column_y, **restrictions)
+        X, Y = np.meshgrid(x, y)
 
-        x = np.unique(data[:][_x])
-        y = np.unique(data[::-1][_y])
+        data = self.get_subset(restrictions=restrictions)
 
-        # for graphene we have to reduce the x-dimension by a factor of 2
-        X = np.zeros((1, 1))
-        Y = np.zeros((1, 1))
         if grid == 'graphenegrid':
             module_logger.debug('assuming graphene grid')
+
+            # for graphene we have to reduce the x-dimension by a factor of 2
             T, Y = np.meshgrid(x[::2], y)
             X = np.zeros(T.shape)
-            module_logger.debug('grid dimensions: %s' % (X.shape, ))
 
             # let the x-shift depend on the y-coordinates:
             # if the change in y is 1 / sqrt(3), there is
             # no x-shift, otherwise, it is 0.5
-            x1 = 0.0
+            x1 = data[0][column_x] - x[0]
+            x3 = 0.5 - x1
             if y[1] - y[0] == 1 / np.sqrt(3):
-                x1 = data[0][_x] - x[0]
                 x2 = x1
-                x3 = 0.5 - x1
                 x4 = 0.5 - x1
             else:
-                x1 = data[0][_x] - x[0]
                 x2 = 0.5 - x1
-                x3 = 0.5 - x1
                 x4 = x1
-
-            #x1 = 0.5
-            #x2 = 0
-            #x3 = x2
-            #x4 = x1
-            # print x1, x2, x3, x4
 
             X[0::4] = T[0::4] + x1
             X[1::4] = T[1::4] + x2
             X[2::4] = T[2::4] + x3
             X[3::4] = T[3::4] + x4
-        else:
-            module_logger.debug('assuming square grid')
-            module_logger.debug("x-shape: %s" % x.shape)
-            module_logger.debug("y-shape: %s" % y.shape)
-            X, Y = np.meshgrid(x, y)
 
         extent = (x.min(), x.max(), y.min(), y.max())
 
@@ -761,31 +744,30 @@ class MultiMap:
             for row in data:
                 xi = 0
                 if grid == "graphenegrid":
-                    xi = int(np.where(x == row[_x])[0][0] / 2)
+                    xi = int(np.where(x == row[column_x])[0][0] / 2)
                 else:
-                    xi = int(np.where(x == row[_x])[0][0] / 1)
-                yi, = np.where(y == row[_y])[0]
-                Z[yi, xi] = row[_z]
+                    xi = int(np.where(x == row[column_x])[0][0] / 1)
+                yi, = np.where(y == row[column_y])[0]
+                Z[yi, xi] = row[column_z]
         else:
             # NOTE missing values rot this reshaping, an additional method
             # for that case is the one commented out below, but this is by
             # far less fast
-            difference = Y.shape[0] * Y.shape[1] - len(data[:][_z])
-            module_logger.debug('datapoints %i' % len(data[:][_z]))
+            difference = Y.shape[0] * Y.shape[1] - len(data[:][column_z])
+            module_logger.debug('datapoints %i' % len(data[:][column_z]))
             module_logger.debug('grid size %i' % (Y.shape[0] * Y.shape[1]))
             module_logger.debug('difference to optimum entry number %i' %
                                 difference)
             if difference > 0:
-                data = np.sort(data, order=[_x, _y])
+                data = np.sort(data, order=[column_x, column_y])
                 data = np.append(data[:], data[-difference:])
-                data = np.sort(data, order=[_y, _x])
+                data = np.sort(data, order=[column_y, column_x])
 
-            module_logger.debug('datapoints %i' % len(data[:][_z]))
-            Z = data[:][_z].reshape(Y.shape)
+            module_logger.debug('datapoints %i' % len(data[:][column_z]))
+            Z = data[:][column_z].reshape(Y.shape)
 
-        if N > 1:
-            g = gauss_kern(N)
-            Z = ssignal.convolve(Z, g, 'same')
+        g = gauss_kern(N)
+        Z = ssignal.convolve(Z, g, 'same')
 
         return (X, Y, Z, extent)
 
@@ -809,60 +791,61 @@ class MultiMap:
         else:
             return np.amax(self.data[:][column])
 
-    def get_x_of_minimum_value(self, x_column, y_column, absolute=False):
+    def get_x_of_minimum_value(self, column_x, column_y, absolute=False):
         '''
-        Return the value of ``x_column`` where ``y_column`` has the least
+        Return the value of ``column_x`` where ``column_y`` has the least
         value (absolute value if ``absolute`` is True).
         '''
-        y_value = self.get_minimum_value(y_column, absolute)
-        restriction = {y_column: y_value}
-        x_values = self.get_column_hard_restriction(x_column, **restriction)
+        y_value = self.get_minimum_value(column_y, absolute)
+        restriction = {column_y: y_value}
+        x_values = self.get_column_hard_restriction(column_x, **restriction)
 
         return (x_values, y_value)
 
-    def get_x_of_maximum_value(self, x_column, y_column, absolute=False):
+    def get_x_of_maximum_value(self, column_x, column_y, absolute=False):
         '''
-        Return the value of ``x_column`` where ``y_column`` has the largest
+        Return the value of ``column_x`` where ``column_y`` has the largest
         value (absolute value if ``absolute`` is True).
         '''
-        y_value = self.get_maximum_value(y_column, absolute)
-        restriction = {y_column: y_value}
-        x_values = self.get_column_hard_restriction(x_column, **restriction)
+        y_value = self.get_maximum_value(column_y, absolute)
+        restriction = {column_y: y_value}
+        x_values = self.get_column_hard_restriction(column_x, **restriction)
 
         return (x_values, y_value)
 
-    def get_column_general(self, _col_name, _col2_names=[], _lambda=None,
-                           _deletion=False):
+    def get_column_general(self, column, columns_restriction=[],
+                           restriction=None, deletion=False):
         """
         Return a column allowing for very general restrictions.
 
-        :param str _col_name: name of the column to retrieve
-        :param list _col2_names2: list of columns that enter the choice which
-            entries are choosen
-        :param _lambda: function or method which expects a list of column names
-            and returns a boolean for the selection of the columns
-        :param bool _deletion: Delete selected rows if set to True
-
-        .. todo::
-            improvements needed
+        :param str column: name of the column to retrieve
+        :param list columns_restriction: list of columns that enter the choice
+            which entries are choosen
+        :param restriction: function or method which expects a list of column
+            names and returns a boolean for the selection of the columns
+        :param bool deletion: Delete selected rows if set to True
         """
         result = self.data[:]
         indices = np.array(range(self.data.shape[0]))
 
         i = 0
-        for rest_name in _col2_names:
-            result = result[np.where(_lambda(i, result[:][rest_name]))]
-            indices = indices[np.where(_lambda(i, result[:][rest_name]))]
+        for rest_name in columns_restriction:
+            result = result[np.where(restriction(i, result[:][rest_name]))]
+            indices = indices[np.where(restriction(i, result[:][rest_name]))]
             i += 1
 
-        if _deletion:
-                self.data = np.delete(self.data, indices, 0)
+        if deletion:
+            self.data = np.delete(self.data, indices, 0)
 
-        return result[:][_col_name]
+        return result[:][column]
 
-    def get_column_hard_restriction(self, desire, **restrictions):
+    def get_column_hard_restriction(self, column, **restrictions):
         """
         Return the content of column desire under hard (==) restrictions.
+
+        :param str column: Name of the column to retrieve
+        :param restrictions: Dictionary object with column names as keys and
+            the desired values as values.
 
         Returns an array according to some hard restriction, i.e.
         requesting column "desire" where all the key of "restrictions"
@@ -870,12 +853,19 @@ class MultiMap:
         """
         result = self.get_subset(restrictions)
 
-        return result[desire]
+        return result[column]
 
     def retrieve_quiver_plot_data(self, _x, _y, _u, _v, N=5, **kwargs):
-        """ for detailed information what a quiver plot is, please read
-            matplotlib documentation; this method basically returns the data
-            in a format as the matplotlib.pyplot.quiver method understand
+        """
+        Return data ready for a quiver plot.
+
+        For detailed information what a quiver plot is, please read
+        matplotlib documentation; this method basically returns the data
+        in a format as the matplotlib.pyplot.quiver method understand
+
+        .. todo::
+            haven't used this function for a long time and not sure if this
+            really works.
         """
         module_logger.info("retrieve_quiver_plot_data, x-col: %s" % (_x))
         module_logger.info("retrieve_quiver_plot_data, y-col: %s" % (_y))
@@ -960,12 +950,12 @@ class MultiMap:
         tmp = self.get_column(column)
         return tmp.mean()
 
-    def get_histogram(self, col, restrictions={}, **kwargs):
+    def get_histogram(self, column, restrictions={}, **kwargs):
         """
-        Return a histogram for the values in column ``col``.
+        Return a histogram for the values in column ``column``.
         """
         kwargs = dict(kwargs)
-        x = self.get_column(col)
+        x = self.get_column(column)
 
         if 'bins' not in kwargs.keys():
             kwargs['bins'] = 20
@@ -980,13 +970,13 @@ class MultiMap:
     """
     Data manipulation
     """
-    def add_column(self, new_name, dataType=np.float64,
+    def add_column(self, new_name, dtype=np.float64,
                    origin=[], connection=None, args=()):
         """
         Add a new column ``new_name``.
 
         :param str new_name: Name of the new column, should not be used before.
-        :param dataType: Data type of the new column, any Python type is
+        :param dtype: Data type of the new column, any Python type is
             allowed.
         :param list origin: List of columns whose values influence the values
             of the new column.
@@ -998,8 +988,8 @@ class MultiMap:
         Otherwise its entries are calculated using the function ``connection``
         with the columns in ``origin`` as input.
         """
-        new_datatype = self.dataType
-        new_datatype.append((new_name, dataType))
+        new_datatype = self.dtype
+        new_datatype.append((new_name, dtype))
 
         if connection is None:
             newCol = np.zeros((self.data.size,))
@@ -1028,19 +1018,19 @@ class MultiMap:
 
         self.data = tmp
 
-        self.dataType = new_datatype
+        self.dtype = new_datatype
         self.columns.append(new_name)
 
-    def append_row(self, row):
+    def append_row(self, new_row):
         """
-        Append iterable ``row`` to the MultiMap.
+        Append iterable ``new_row`` to the MultiMap.
 
-        Note that ``row`` has to fit to the defined data type.
+        Note that ``new_row`` has to fit to the defined data type.
         """
-        module_logger.debug("append_row(%s)" % (row,))
+        module_logger.debug("append_row(%s)" % (new_row,))
 
         try:
-            new_row = np.array(tuple(row), dtype=self.data.dtype, ndmin=2)
+            new_row = np.array(tuple(new_row), dtype=self.data.dtype, ndmin=2)
             self.data = np.append(self.data, new_row)
         except:
             raise
@@ -1057,30 +1047,30 @@ class MultiMap:
         except:
             raise
 
-    def add_to_column(self, col, values):
+    def add_to_column(self, column, values):
         """
-        Calculate sum of entries in ``col`` and ``values`` and change ``col``
-        accordingly.
+        Calculate sum of entries in ``column`` and ``values`` and change
+        ``column`` accordingly.
 
-        :param str col: Column that will be modified
+        :param str column: Column that will be modified
         :param values: Scalar or numpy.array, scalar will be added to all rows
             the same ways, numpy.arrays should have the same number of entries
             as the MultiMap.
         """
         try:
-            self.data[col] = self.data[col] + values.transpose()
+            self.data[column] = self.data[column] + values.transpose()
         except AttributeError:
             # It seem's we're only adding a single number
-            self.data[col] = self.data[col] + values
+            self.data[column] = self.data[column] + values
         except:
             raise
 
-    def multiply_column(self, col, factor):
+    def multiply_column(self, column, factor):
         """
-        Multiply entries in column ``col`` by ``factor``.
+        Multiply entries in column ``column`` by ``factor``.
         """
         try:
-            self.data[col] *= factor
+            self.data[column] *= factor
         except:
             raise
 
@@ -1089,7 +1079,7 @@ class MultiMap:
         Remove all columns given in ``names_of_columns``.
         """
         new_datatype = [x
-                        for x in self.dataType
+                        for x in self.dtype
                         if x[0] not in names_of_columns]
 
         tmp = np.empty(self.data.shape, dtype=new_datatype)
@@ -1097,31 +1087,31 @@ class MultiMap:
             tmp[name] = self.data[name]
 
         self.data = tmp
-        self.dataType = new_datatype
+        self.dtype = new_datatype
         self.columns = list(self.data.dtype.names)
 
     def remove_column(self, name_of_column):
-        new_datatype = [x for x in self.dataType if x[0] is not name_of_column]
+        new_datatype = [x for x in self.dtype if x[0] is not name_of_column]
 
         tmp = np.empty(self.data.shape, dtype=new_datatype)
         for name in tmp.dtype.names:
             tmp[name] = self.data[name]
 
         self.data = tmp
-        self.dataType = new_datatype
+        self.dtype = new_datatype
         self.columns = list(self.data.dtype.names)
 
     def rename_column(self, old_column_name, new_column_name):
         """
         Rename column from ``old_column_name`` to ``new_column_name``.
         """
-        temporary_data_type = self.dataType
+        temporary_data_type = self.dtype
         new_data_type = [(x, y) if x != old_column_name
                          else (new_column_name, y)
                          for x, y in temporary_data_type]
         new_columns = [x for x, y in new_data_type]
         self.columns = new_columns
-        self.dataType = new_data_type
+        self.dtype = new_data_type
         self.data.dtype = new_data_type
 
     def reduce(self, columns_to_drop=[], static=[],
@@ -1153,7 +1143,7 @@ class MultiMap:
             print "    columns to drop: %s" % (columns_to_drop,)
             print "    static columns: %s" % (static,)
 
-        self.add_column('__sorting__', dataType="|S200",
+        self.add_column('__sorting__', dtype="|S200",
                         origin=static, connection=create_ordering_column)
 
         module_logger.debug("... added sorting column")
@@ -1251,7 +1241,7 @@ class MultiMap:
             print end - start
 
         self.data = new_object.data
-        self.dataType = new_object.dataType
+        self.dtype = new_object.dtype
         self.columns = list(self.data.dtype.names)
 
     def reduction_distributed_dispy(self, static, averaging_cols,
@@ -1336,7 +1326,7 @@ class MultiMap:
         print end - start
 
         self.data = new_object.data
-        self.dataType = new_object.dataType
+        self.dtype = new_object.dtype
         self.columns = list(self.data.dtype.names)
 
 if __name__ == "__main__":
