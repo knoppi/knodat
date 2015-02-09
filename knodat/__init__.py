@@ -1,0 +1,6 @@
+__version__ = "0.9"
+__author__ = "Jan Bundesmann"
+__copyright__ = "Copyright 2014, Jan Bundesmann"
+__license__ = "GPLv2+"
+__maintainer__ = "Jan Bundesmann"
+__email__ = "jan.bundesmann@gmx.de"
