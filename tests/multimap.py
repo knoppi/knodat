@@ -7,13 +7,13 @@ sys.path.insert(0, "..")
 import unittest
 import numpy as np
 
-import multimap
+import knodat.multimap
 
 
 class TestMultiMap(unittest.TestCase):
     def setUp(self):
-        self.data = multimap.MultiMap("birds.dat")
-        self.reduced_data = multimap.MultiMap("birds_reduced.npy")
+        self.data = knodat.multimap.MultiMap("birds.dat")
+        self.reduced_data = knodat.multimap.MultiMap("birds_reduced.npy")
 
     def test_get1(self):
         self.assertTrue(np.all(
@@ -90,7 +90,6 @@ class TestMultiMap(unittest.TestCase):
         self.assertTrue(np.all(x_ref == x))
         self.assertTrue(np.all(y_ref == y))
         self.assertTrue(np.all(z == z2))
-
 
 
 if __name__ == '__main__':
