@@ -1,0 +1,2 @@
+.. role:: methodgroup
+    :class: methodgroup

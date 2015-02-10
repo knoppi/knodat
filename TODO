@@ -1,0 +1,10 @@
+Feature to implemented in the future
+    - a sort of example?
+    - reinclude evtools
+    - write README-file
+
+Other todo:
+    - delete deprecated methods
+    - uniform structure in function / method headers
+    - conformity with PEP-XXX
+    - what to do with debug output?

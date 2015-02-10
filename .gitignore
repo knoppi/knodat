@@ -1,0 +1,9 @@
+.ropeproject
+doc/build
+
+# ignore Python bytecode
+*.pyc
+
+# During development I keep track of changes in commit.msg which should
+# not be part of the repository.
+commit.msg
