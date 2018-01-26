@@ -245,9 +245,9 @@ class MultiMap:
         Further parameters are required for the control of the loadtxt function.
         """
         self.filename = filename
-        for (key, val) in options:
+        for (key, val) in dict(options):
             if key == "delimiter":
-                self.separator = val
+                self.delimiter = val
             if key == "fieldnames":
                 self.set_column_names(val)
             # if key == "skipinitialspaces":
@@ -280,7 +280,8 @@ class MultiMap:
                 column_names = [str(x) for x in range(1, number_of_cols + 1)]
                 self.set_column_names(*column_names)
 
-        self.data = np.loadtxt(filename, dtype=self.dtype)
+        self.data = np.loadtxt(filename, dtype=self.dtype,
+                               delimiter=self.delimiter)
 
         module_logger.debug("finished reading file")
 
