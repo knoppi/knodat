@@ -280,8 +280,10 @@ class MultiMap:
                 column_names = [str(x) for x in range(1, number_of_cols + 1)]
                 self.set_column_names(*column_names)
 
-        self.data = np.loadtxt(filename, dtype=self.dtype,
-                               delimiter=self.delimiter)
+        try:
+            self.data = np.loadtxt(filename, dtype=self.dtype, delimiter=self.delimiter)
+        except AttributeError:
+            self.data = np.loadtxt(filename, dtype=self.dtype)
 
         module_logger.debug("finished reading file")
 
