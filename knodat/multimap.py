@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 This is the core element of the project. It provides the class
@@ -57,7 +57,7 @@ def gauss_kern(size, sizey=None):
 
     x, y = np.mgrid[-size:size + 1, -sizey:sizey + 1]
     g = np.exp(- (x ** 2 / float(size) + y ** 2 / float(sizey)))
-    print g
+    print(g)
     return g / g.sum()
 
 
@@ -365,7 +365,7 @@ class MultiMap:
         written directly to std::out.
         """
         try:
-            print "data loaded from: %s" % self.filename
+            print("data loaded from: %s" % self.filename)
         except AttributeError:
             # data not read from file but freshly created
             pass
@@ -373,24 +373,24 @@ class MultiMap:
             raise
 
         for item in self.dtype:
-            print ("%20s: %s" % (item[0], item[1]))
+            print("%20s: %s" % (item[0], item[1]))
 
-        print "MultiMap contains %i entries" % self.length()
-        print "MultiMap shape: %s" % (self.data.shape, )
+        print("MultiMap contains %i entries" % self.length())
+        print("MultiMap shape: %s" % (self.data.shape, ))
 
         if self.length() > 1:
             for column in self.columns:
                 values = self.get_possible_values(column)
                 formatting = "%27s %13s: %s"
                 if len(values) == 1:
-                    print formatting % ("fixed parameter", column, values[0])
+                    print(formatting % ("fixed parameter", column, values[0]))
                 elif len(values) < 5:
-                    print formatting % ("parameter with few values",
-                                        column, values)
+                    print(formatting % ("parameter with few values",
+                                        column, values))
                 else:
                     limits = ("%s - %s" % (min(values), max(values)))
                     description = "parameter with %i values" % len(values)
-                    print formatting % (description, column, limits)
+                    print(formatting % (description, column, limits))
 
     def length(self):
         """
@@ -400,7 +400,6 @@ class MultiMap:
             return self.data.shape[0]
         except IndexError:
             # let's just assume that we only have one entry
-            # print self.data
             return 1
 
     """
@@ -1142,9 +1141,9 @@ class MultiMap:
             used here.
         """
         if verbose is True:
-            print "performing reduction"
-            print "    columns to drop: %s" % (columns_to_drop,)
-            print "    static columns: %s" % (static,)
+            print("performing reduction")
+            print("    columns to drop: %s" % (columns_to_drop,))
+            print("    static columns: %s" % (static,))
 
         self.add_column('__sorting__', dtype="|S200",
                         origin=static, connection=create_ordering_column)
@@ -1241,7 +1240,7 @@ class MultiMap:
             sys.stdout.write("\n")
 
             end = time.clock()
-            print end - start
+            print(end - start)
 
         self.data = new_object.data
         self.dtype = new_object.dtype
@@ -1326,11 +1325,11 @@ class MultiMap:
         cluster.stats()
 
         end = time.clock()
-        print end - start
+        print(end - start)
 
         self.data = new_object.data
         self.dtype = new_object.dtype
         self.columns = list(self.data.dtype.names)
 
 if __name__ == "__main__":
-    print "nothing to do here..."
+    print("nothing to do here...")

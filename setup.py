@@ -13,7 +13,7 @@ with open(path.join(here, 'README.rst')) as f:
 
 setup(
     name='KnoDat',
-    version='0.9',
+    version='0.9.1',
     description='A set of tools developed for treatment of numerical data',
     long_description=long_description,
     url="http://knodat.knofafo.de",
